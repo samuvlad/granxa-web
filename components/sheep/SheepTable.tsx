@@ -1,0 +1,181 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+
+import type { EstadoAnimal, Sexo, Sheep } from "@/types";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  formatIdade,
+  SexBadge,
+  StatusBadge,
+} from "@/components/sheep/SheepStatusBadge";
+
+interface SheepTableProps {
+  sheep: Sheep[];
+  isLoading: boolean;
+  onAdd: () => void;
+  onEdit: (sheep: Sheep) => void;
+  onDelete: (sheep: Sheep) => void;
+}
+
+const ALL = "__all__";
+
+export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepTableProps) {
+  const [search, setSearch] = useState("");
+  const [sexFilter, setSexFilter] = useState<Sexo | typeof ALL>(ALL);
+  const [statusFilter, setStatusFilter] = useState<EstadoAnimal | typeof ALL>(ALL);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return sheep.filter((s) => {
+      if (sexFilter !== ALL && s.sexo !== sexFilter) return false;
+      if (statusFilter !== ALL && s.estado !== statusFilter) return false;
+      if (!term) return true;
+      return (
+        s.crotal.toLowerCase().includes(term) ||
+        (s.nome ?? "").toLowerCase().includes(term) ||
+        s.raca.toLowerCase().includes(term)
+      );
+    });
+  }, [sheep, search, sexFilter, statusFilter]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por crotal, nome ou raza…"
+          className="max-w-xs"
+        />
+        <Select
+          value={sexFilter}
+          onValueChange={(v) => setSexFilter(v as Sexo | typeof ALL)}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os sexos</SelectItem>
+            <SelectItem value="femia">Femias</SelectItem>
+            <SelectItem value="macho">Machos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as EstadoAnimal | typeof ALL)}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os estados</SelectItem>
+            <SelectItem value="activo">Activos</SelectItem>
+            <SelectItem value="vendido">Vendidos</SelectItem>
+            <SelectItem value="morto">Mertos</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex-1" />
+        <div className="text-sm text-muted-foreground">
+          {filtered.length} de {sheep.length}
+        </div>
+        <Button onClick={onAdd}>
+          <PlusIcon className="size-4" />
+          Engadir ovella
+        </Button>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Crotal</th>
+                <th className="px-4 py-3 text-left font-medium">Nome</th>
+                <th className="px-4 py-3 text-left font-medium">Sexo</th>
+                <th className="px-4 py-3 text-left font-medium">Raza</th>
+                <th className="px-4 py-3 text-left font-medium">Idade</th>
+                <th className="px-4 py-3 text-left font-medium">Estado</th>
+                <th className="px-4 py-3 w-10" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    Cargando…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    Non hai ovellas que coincidan cos filtros.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((s) => (
+                  <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs">{s.crotal}</td>
+                    <td className="px-4 py-3 font-medium">{s.nome ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <SexBadge sexo={s.sexo} />
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{s.raca}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatIdade(s.data_nacemento)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge estado={s.estado} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button variant="ghost" size="icon-sm" aria-label="Accións" />
+                          }
+                        >
+                          <MoreHorizontalIcon className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onEdit(s)}>
+                            <PencilIcon className="size-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => onDelete(s)}
+                          >
+                            <Trash2Icon className="size-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
