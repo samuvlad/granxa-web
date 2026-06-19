@@ -12,14 +12,14 @@ import { getApiErrorMessage } from "@/lib/api";
 import {
   useCreateSheep,
   useDeleteSheep,
-  usePlots,
+  useLotes,
   useSheep,
   useUpdateSheep,
 } from "@/lib/queries";
 
 export default function RebanhoPage() {
   const { data: sheep = [], isLoading } = useSheep();
-  const { data: plots = [] } = usePlots();
+  const { data: lotes = [] } = useLotes();
   const createSheep = useCreateSheep();
   const updateSheep = useUpdateSheep();
   const deleteSheep = useDeleteSheep();
@@ -79,12 +79,13 @@ export default function RebanhoPage() {
     <main className="h-full w-full overflow-y-auto p-6 space-y-6">
       <PageHeader
         title="Rebaño"
-        description="Xestión das ovellas da granxa: crotal, sexo, raza e estado"
+        description="Xestión das ovellas da granxa: crotal, sexo, raza, lote e estado"
         icon={PawPrintIcon}
       />
       <SheepTable
         sheep={sheep}
         isLoading={isLoading}
+        lotes={lotes}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
@@ -94,7 +95,7 @@ export default function RebanhoPage() {
         onOpenChange={handleOpenChange}
         sheep={editing}
         sheepOptions={sheep}
-        plots={plots}
+        lotes={lotes}
         onSubmit={handleSubmit}
         isPending={isPending}
         errorMessage={formError}

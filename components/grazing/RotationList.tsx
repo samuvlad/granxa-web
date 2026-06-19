@@ -10,7 +10,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
-import type { Plot, Rotation } from "@/types";
+import type { Lote, Plot, Rotation } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import { formatDate } from "@/components/sheep/SheepStatusBadge";
 interface RotationListProps {
   rotations: Rotation[];
   plots: Plot[];
+  lotes: Lote[];
   isLoading: boolean;
   onEdit: (rotation: Rotation) => void;
   onDelete: (rotation: Rotation) => void;
@@ -35,6 +36,7 @@ interface RotationListProps {
 export function RotationList({
   rotations,
   plots,
+  lotes,
   isLoading,
   onEdit,
   onDelete,
@@ -55,6 +57,12 @@ export function RotationList({
     plots.forEach((p) => map.set(p.id, p));
     return map;
   }, [plots]);
+
+  const loteById = useMemo(() => {
+    const map = new Map<number, Lote>();
+    lotes.forEach((l) => map.set(l.id, l));
+    return map;
+  }, [lotes]);
 
   return (
     <div className="space-y-8">
@@ -78,6 +86,7 @@ export function RotationList({
                 key={r.id}
                 rotation={r}
                 plot={plotById.get(r.parcela_id)}
+                lote={loteById.get(r.lote_id)}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onFinish={onFinish}
@@ -104,6 +113,7 @@ export function RotationList({
                 key={r.id}
                 rotation={r}
                 plot={plotById.get(r.parcela_id)}
+                lote={loteById.get(r.lote_id)}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onFinish={onFinish}
@@ -119,6 +129,7 @@ export function RotationList({
 function RotationCard({
   rotation,
   plot,
+  lote,
   onEdit,
   onDelete,
   onFinish,
@@ -126,6 +137,7 @@ function RotationCard({
 }: {
   rotation: Rotation;
   plot: Plot | undefined;
+  lote: Lote | undefined;
   onEdit: (rotation: Rotation) => void;
   onDelete: (rotation: Rotation) => void;
   onFinish: (rotation: Rotation) => void;
@@ -142,7 +154,9 @@ function RotationCard({
                 style={{ backgroundColor: plot.color }}
               />
             ) : null}
-            <CardTitle className="truncate">{rotation.lote_nome}</CardTitle>
+            <CardTitle className="truncate">
+              {lote?.name ?? `Lote ${rotation.lote_id}`}
+            </CardTitle>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger

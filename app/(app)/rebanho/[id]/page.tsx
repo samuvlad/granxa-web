@@ -29,6 +29,7 @@ import {
 } from "@/components/sheep/SheepStatusBadge";
 import {
   useDeleteSheep,
+  useLotes,
   usePlots,
   useSheep,
   useSheepDetail,
@@ -45,6 +46,7 @@ export default function SheepDetailPage({
   const { data: sheep } = useSheepDetail(sheepId);
   const { data: allSheep = [] } = useSheep();
   const { data: plots = [] } = usePlots();
+  const { data: lotes = [] } = useLotes();
   const updateSheep = useUpdateSheep();
   const deleteSheep = useDeleteSheep();
 
@@ -72,6 +74,10 @@ export default function SheepDetailPage({
   const nai = sheep.nai_id ? allSheep.find((s) => s.id === sheep.nai_id) : null;
   const pai = sheep.pai_id ? allSheep.find((s) => s.id === sheep.pai_id) : null;
   const fillos = allSheep.filter((s) => s.nai_id === sheep.id || s.pai_id === sheep.id);
+  const lote = sheep.lote_id ? lotes.find((l) => l.id === sheep.lote_id) : null;
+  const parcela = sheep.parcela_actual_id
+    ? plots.find((p) => p.id === sheep.parcela_actual_id)
+    : null;
 
   const handleDelete = () => {
     if (!confirm(`Eliminar a ovella ${sheep.nome ?? sheep.crotal}?`)) return;
@@ -158,6 +164,28 @@ export default function SheepDetailPage({
             <Field label="Raza" value={sheep.raca} />
             <Field label="Data de nacemento" value={formatDate(sheep.data_nacemento)} />
             <Field
+              label="Lote"
+              value={lote ? lote.name : "—"}
+            />
+            <Field
+              label="Parcela actual"
+              value={
+                parcela ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="size-2.5 rounded-full border border-black/10"
+                      style={{ backgroundColor: parcela.color }}
+                    />
+                    {parcela.name}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Sen parcela (o lote non ten rotación activa)
+                  </span>
+                )
+              }
+            />
+            <Field
               label="Nai"
               value={
                 nai ? (
@@ -241,7 +269,7 @@ export default function SheepDetailPage({
         onOpenChange={setEditOpen}
         sheep={sheep}
         sheepOptions={allSheep}
-        plots={plots}
+        lotes={lotes}
         isPending={updateSheep.isPending}
         onSubmit={(data: SheepCreate) => {
           updateSheep.mutate(

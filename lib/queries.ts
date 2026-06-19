@@ -5,22 +5,28 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  createLote,
   createPlot,
   createRotation,
   createSheep,
+  deleteLote,
   deletePlot,
   deleteRotation,
   deleteSheep,
+  getLote,
   getRotation,
   getSheep,
+  listLotes,
   listPlots,
   listRotations,
   listSheep,
+  updateLote,
   updatePlot,
   updateRotation,
   updateSheep,
 } from "@/lib/api";
 import type {
+  LoteUpdate,
   PlotUpdate,
   RotationUpdate,
   SheepUpdate,
@@ -28,6 +34,7 @@ import type {
 
 export const PLOTS_KEY = "plots";
 export const SHEEP_KEY = "sheep";
+export const LOTES_KEY = "lotes";
 export const ROTATIONS_KEY = "rotations";
 
 export function usePlots() {
@@ -117,6 +124,52 @@ export function useDeleteSheep() {
   });
 }
 
+export function useLotes() {
+  return useQuery({
+    queryKey: [LOTES_KEY],
+    queryFn: listLotes,
+  });
+}
+
+export function useLoteDetail(id: number) {
+  return useQuery({
+    queryKey: [LOTES_KEY, id],
+    queryFn: () => getLote(id),
+    enabled: Number.isFinite(id) && id > 0,
+  });
+}
+
+export function useCreateLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createLote,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
+    },
+  });
+}
+
+export function useUpdateLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, lote }: { id: number; lote: LoteUpdate }) =>
+      updateLote(id, lote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
+    },
+  });
+}
+
+export function useDeleteLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteLote,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
+    },
+  });
+}
+
 export function useRotations() {
   return useQuery({
     queryKey: [ROTATIONS_KEY],
@@ -138,6 +191,7 @@ export function useCreateRotation() {
     mutationFn: createRotation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ROTATIONS_KEY] });
+      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
     },
   });
 }
@@ -154,6 +208,7 @@ export function useUpdateRotation() {
     }) => updateRotation(id, rotation),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ROTATIONS_KEY] });
+      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
     },
   });
 }

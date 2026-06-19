@@ -1,5 +1,8 @@
 import axios from "axios";
 import type {
+  Lote,
+  LoteCreate,
+  LoteUpdate,
   Plot,
   PlotCreate,
   PlotUpdate,
@@ -84,6 +87,30 @@ export async function updateSheep(
 
 export async function deleteSheep(id: number): Promise<void> {
   await api.delete(`/sheep/${id}`);
+}
+
+export async function listLotes(): Promise<Lote[]> {
+  const res = await api.get<Lote[]>("/lotes/");
+  return res.data;
+}
+
+export async function getLote(id: number): Promise<Lote> {
+  const res = await api.get<Lote>(`/lotes/${id}`);
+  return res.data;
+}
+
+export async function createLote(lote: LoteCreate): Promise<Lote> {
+  const res = await api.post<Lote>("/lotes/", lote);
+  return res.data;
+}
+
+export async function updateLote(id: number, lote: LoteUpdate): Promise<Lote> {
+  const res = await api.patch<Lote>(`/lotes/${id}`, lote);
+  return res.data;
+}
+
+export async function deleteLote(id: number): Promise<void> {
+  await api.delete(`/lotes/${id}`);
 }
 
 export async function listRotations(): Promise<Rotation[]> {

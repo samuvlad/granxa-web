@@ -14,6 +14,7 @@ import {
   PackageIcon,
   WalletIcon,
   SproutIcon,
+  UsersIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Gando",
     items: [
+      { href: "/lotes", label: "Lotes", icon: UsersIcon },
       { href: "/rebanho", label: "Rebaño", icon: PawPrintIcon },
       { href: "/pastoreo", label: "Pastoreo", icon: RotateCwIcon },
       { href: "/sanidade", label: "Sanidade", icon: StethoscopeIcon, disabled: true },

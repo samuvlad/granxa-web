@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SaveIcon } from "lucide-react";
 
-import type { Plot, Sexo, Sheep, SheepCreate, EstadoAnimal } from "@/types";
+import type { Lote, Sexo, Sheep, SheepCreate, EstadoAnimal } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,7 @@ interface SheepFormDialogProps {
   onOpenChange: (open: boolean) => void;
   sheep?: Sheep | null;
   sheepOptions: Sheep[];
-  plots?: Plot[];
+  lotes?: Lote[];
   onSubmit: (data: SheepCreate) => void;
   isPending?: boolean;
   errorMessage?: string | null;
@@ -52,7 +52,7 @@ function defaultsFromSheep(
   estado: EstadoAnimal;
   naiId: string;
   paiId: string;
-  parcelaActualId: string;
+  loteId: string;
   notas: string;
 } {
   if (sheep) {
@@ -65,9 +65,7 @@ function defaultsFromSheep(
       estado: sheep.estado,
       naiId: sheep.nai_id ? String(sheep.nai_id) : "",
       paiId: sheep.pai_id ? String(sheep.pai_id) : "",
-      parcelaActualId: sheep.parcela_actual_id
-        ? String(sheep.parcela_actual_id)
-        : "",
+      loteId: sheep.lote_id ? String(sheep.lote_id) : "",
       notas: sheep.notas ?? "",
     };
   }
@@ -80,7 +78,7 @@ function defaultsFromSheep(
     estado: "activo",
     naiId: "",
     paiId: "",
-    parcelaActualId: "",
+    loteId: "",
     notas: "",
   };
 }
@@ -90,7 +88,7 @@ export function SheepFormDialog({
   onOpenChange,
   sheep,
   sheepOptions,
-  plots = [],
+  lotes = [],
   onSubmit,
   isPending,
   errorMessage,
@@ -104,7 +102,7 @@ export function SheepFormDialog({
           key={sheep?.id ?? "new"}
           sheep={sheep}
           sheepOptions={sheepOptions}
-          plots={plots}
+          lotes={lotes}
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}
           isPending={!!isPending}
@@ -118,7 +116,7 @@ export function SheepFormDialog({
 function SheepFormBody({
   sheep,
   sheepOptions,
-  plots,
+  lotes,
   onSubmit,
   onCancel,
   isPending,
@@ -126,7 +124,7 @@ function SheepFormBody({
 }: {
   sheep?: Sheep | null;
   sheepOptions: Sheep[];
-  plots: Plot[];
+  lotes: Lote[];
   onSubmit: (data: SheepCreate) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -141,9 +139,7 @@ function SheepFormBody({
   const [estado, setEstado] = useState<EstadoAnimal>(initial.estado);
   const [naiId, setNaiId] = useState<string>(initial.naiId);
   const [paiId, setPaiId] = useState<string>(initial.paiId);
-  const [parcelaActualId, setParcelaActualId] = useState<string>(
-    initial.parcelaActualId
-  );
+  const [loteId, setLoteId] = useState<string>(initial.loteId);
   const [notas, setNotas] = useState(initial.notas);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -157,7 +153,7 @@ function SheepFormBody({
       estado,
       nai_id: naiId ? Number(naiId) : null,
       pai_id: paiId ? Number(paiId) : null,
-      parcela_actual_id: parcelaActualId ? Number(parcelaActualId) : null,
+      lote_id: loteId ? Number(loteId) : null,
       notas: notas.trim() || null,
     });
   };
@@ -240,6 +236,29 @@ function SheepFormBody({
         </div>
 
         <div className="space-y-1.5 col-span-2">
+          <Label htmlFor="lote">Lote</Label>
+          <Select
+            value={loteId}
+            onValueChange={(v) => setLoteId(v ?? "")}
+          >
+            <SelectTrigger id="lote" className="w-full">
+              <SelectValue placeholder="Sen asignar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Sen asignar</SelectItem>
+              {lotes.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            A parcela actual derivarase automaticamente da rotación activa do lote.
+          </p>
+        </div>
+
+        <div className="space-y-1.5 col-span-2">
           <Label htmlFor="estado">Estado</Label>
           <Select
             value={estado}
@@ -256,26 +275,6 @@ function SheepFormBody({
                     : s === "vendido"
                       ? "Vendido"
                       : "Morto"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5 col-span-2">
-          <Label htmlFor="parcela-actual">Parcela actual</Label>
-          <Select
-            value={parcelaActualId}
-            onValueChange={(v) => setParcelaActualId(v ?? "")}
-          >
-            <SelectTrigger id="parcela-actual" className="w-full">
-              <SelectValue placeholder="Sen asignar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Sen asignar</SelectItem>
-              {plots.map((p) => (
-                <SelectItem key={p.id} value={String(p.id)}>
-                  {p.name}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -13,6 +13,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import {
+  useLotes,
   usePlots,
   useRotations,
   useSheep,
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   const { data: sheep = [] } = useSheep();
   const { data: plots = [] } = usePlots();
   const { data: rotations = [] } = useRotations();
+  const { data: lotes = [] } = useLotes();
 
   const stats = useMemo(() => {
     const activeSheep = sheep.filter((s) => s.estado === "activo");
@@ -101,7 +103,7 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ActivityFeed sheep={sheep} />
-        <RotationsSummary rotations={rotations} plots={plots} />
+        <RotationsSummary rotations={rotations} plots={plots} lotes={lotes} />
       </section>
     </main>
   );
@@ -110,12 +112,15 @@ export default function DashboardPage() {
 function RotationsSummary({
   rotations,
   plots,
+  lotes,
 }: {
   rotations: Awaited<ReturnType<typeof useRotations>>["data"];
   plots: Awaited<ReturnType<typeof usePlots>>["data"];
+  lotes: Awaited<ReturnType<typeof useLotes>>["data"];
 }) {
   const active = (rotations ?? []).filter((r) => !r.data_fim);
   const plotById = new Map((plots ?? []).map((p) => [p.id, p]));
+  const loteById = new Map((lotes ?? []).map((l) => [l.id, l]));
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -133,6 +138,7 @@ function RotationsSummary({
         <ul className="divide-y divide-border">
           {active.slice(0, 5).map((r) => {
             const plot = plotById.get(r.parcela_id);
+            const lote = loteById.get(r.lote_id);
             return (
               <li key={r.id} className="px-4 py-3 flex items-center gap-3">
                 {plot ? (
@@ -143,7 +149,7 @@ function RotationsSummary({
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">
-                    {r.lote_nome}
+                    {lote?.name ?? `Lote ${r.lote_id}`}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {plot?.name ?? `Parcela ${r.parcela_id}`}

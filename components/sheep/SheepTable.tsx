@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 
-import type { EstadoAnimal, Sexo, Sheep } from "@/types";
+import type { EstadoAnimal, Lote, Sexo, Sheep } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,23 +30,46 @@ import {
 interface SheepTableProps {
   sheep: Sheep[];
   isLoading: boolean;
+  lotes: Lote[];
   onAdd: () => void;
   onEdit: (sheep: Sheep) => void;
   onDelete: (sheep: Sheep) => void;
 }
 
 const ALL = "__all__";
+const NO_LOTE = "__none__";
 
-export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepTableProps) {
+export function SheepTable({
+  sheep,
+  isLoading,
+  lotes,
+  onAdd,
+  onEdit,
+  onDelete,
+}: SheepTableProps) {
   const [search, setSearch] = useState("");
   const [sexFilter, setSexFilter] = useState<Sexo | typeof ALL>(ALL);
   const [statusFilter, setStatusFilter] = useState<EstadoAnimal | typeof ALL>(ALL);
+  const [loteFilter, setLoteFilter] = useState<string>(ALL);
+
+  const loteById = useMemo(() => {
+    const map = new Map<number, Lote>();
+    lotes.forEach((l) => map.set(l.id, l));
+    return map;
+  }, [lotes]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return sheep.filter((s) => {
       if (sexFilter !== ALL && s.sexo !== sexFilter) return false;
       if (statusFilter !== ALL && s.estado !== statusFilter) return false;
+      if (loteFilter !== ALL) {
+        if (loteFilter === NO_LOTE) {
+          if (s.lote_id != null) return false;
+        } else if (String(s.lote_id ?? "") !== loteFilter) {
+          return false;
+        }
+      }
       if (!term) return true;
       return (
         s.crotal.toLowerCase().includes(term) ||
@@ -54,7 +77,7 @@ export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepT
         s.raca.toLowerCase().includes(term)
       );
     });
-  }, [sheep, search, sexFilter, statusFilter]);
+  }, [sheep, search, sexFilter, statusFilter, loteFilter]);
 
   return (
     <div className="space-y-4">
@@ -92,6 +115,23 @@ export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepT
             <SelectItem value="morto">Mertos</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={loteFilter}
+          onValueChange={(v) => setLoteFilter(v ?? ALL)}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os lotes</SelectItem>
+            <SelectItem value={NO_LOTE}>Sen lote</SelectItem>
+            {lotes.map((l) => (
+              <SelectItem key={l.id} value={String(l.id)}>
+                {l.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex-1" />
         <div className="text-sm text-muted-foreground">
           {filtered.length} de {sheep.length}
@@ -111,6 +151,7 @@ export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepT
                 <th className="px-4 py-3 text-left font-medium">Nome</th>
                 <th className="px-4 py-3 text-left font-medium">Sexo</th>
                 <th className="px-4 py-3 text-left font-medium">Raza</th>
+                <th className="px-4 py-3 text-left font-medium">Lote</th>
                 <th className="px-4 py-3 text-left font-medium">Idade</th>
                 <th className="px-4 py-3 text-left font-medium">Estado</th>
                 <th className="px-4 py-3 w-10" />
@@ -119,13 +160,13 @@ export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepT
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     Cargando…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     Non hai ovellas que coincidan cos filtros.
                   </td>
                 </tr>
@@ -138,6 +179,11 @@ export function SheepTable({ sheep, isLoading, onAdd, onEdit, onDelete }: SheepT
                       <SexBadge sexo={s.sexo} />
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{s.raca}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {s.lote_id != null
+                        ? loteById.get(s.lote_id)?.name ?? `Lote ${s.lote_id}`
+                        : "—"}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatIdade(s.data_nacemento)}
                     </td>
