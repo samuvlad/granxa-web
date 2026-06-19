@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePlots, useCreatePlot, useUpdatePlot, useDeletePlot } from "@/lib/queries";
+import { getApiErrorMessage } from "@/lib/api";
 import { Plot, PlotUpdate } from "@/types";
 
 interface MapViewProps {
@@ -12,6 +13,7 @@ interface MapViewProps {
   isCreatingNew: boolean;
   onStartCreate: () => void;
   onCancelCreate: () => void;
+  onCompleteCreate: () => void;
   draftName: string;
   draftColor: string;
   draftNotes: string;
@@ -25,6 +27,7 @@ export function MapView({
   isCreatingNew,
   onStartCreate,
   onCancelCreate,
+  onCompleteCreate,
   draftName,
   draftColor,
   draftNotes,
@@ -36,11 +39,17 @@ export function MapView({
 
   const [isReady, setIsReady] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const { data: plots = [], isLoading } = usePlots();
   const createPlot = useCreatePlot();
   const updatePlot = useUpdatePlot();
   const deletePlot = useDeletePlot();
+
+  const draftRef = useRef({ name: draftName, color: draftColor, notes: draftNotes });
+  useEffect(() => {
+    draftRef.current = { name: draftName, color: draftColor, notes: draftNotes };
+  }, [draftName, draftColor, draftNotes]);
 
   // Inicializar mapa
   useEffect(() => {
@@ -155,19 +164,32 @@ export function MapView({
         if (e.shape !== "Polygon") return;
 
         const layer = e.layer;
+        const draft = draftRef.current;
+        const trimmedName = (draft.name || "").trim();
+
+        if (!trimmedName) {
+          setCreateError("O nome da parcela é obrigatorio antes de gardala.");
+          mapInstanceRef.current?.removeLayer(layer);
+          return;
+        }
+
         const geojson = layer.toGeoJSON();
 
+        setCreateError(null);
         createPlot.mutate(
           {
-            name: draftName,
-            color: draftColor,
-            notes: draftNotes || null,
+            name: trimmedName,
+            color: draft.color,
+            notes: (draft.notes || "").trim() || null,
             geometry: geojson.geometry as GeoJSON.Polygon,
           },
           {
             onSuccess: (newPlot) => {
-              onCancelCreate();
+              onCompleteCreate();
               onSelectPlot(newPlot.id);
+            },
+            onError: (err) => {
+              setCreateError(getApiErrorMessage(err, "Non se puido gardar a parcela"));
             },
           }
         );
@@ -352,6 +374,7 @@ export function MapView({
 
   const handleStartDraw = () => {
     if (!mapInstanceRef.current) return;
+    setCreateError(null);
     onStartCreate();
     mapInstanceRef.current.pm.enableDraw("Polygon", {
       snappable: true,
@@ -364,6 +387,7 @@ export function MapView({
     if (!mapInstanceRef.current) return;
     mapInstanceRef.current.pm.disableDraw();
     setIsDrawing(false);
+    setCreateError(null);
     onCancelCreate();
   };
 
@@ -380,7 +404,7 @@ export function MapView({
         style={{ width: "100%", height: "100%", minHeight: "100%" }}
       />
 
-      <div className="absolute top-4 left-4 z-[1000] flex gap-2">
+      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 items-start">
         {isCreatingNew ? (
           <button
             onClick={handleCancelDraw}
@@ -397,6 +421,27 @@ export function MapView({
           >
             Nova parcela
           </button>
+        )}
+        {isCreatingNew && (
+          <div className="bg-background/95 border border-primary/30 rounded-md shadow px-3 py-2 text-xs max-w-xs">
+            <p className="font-medium text-foreground mb-0.5">
+              Debuxando nova parcela
+            </p>
+            <p className="text-muted-foreground">
+              Fai clic no mapa para colocar os vértices e fai clic no primeiro
+              vértice (ou preme Enter) para pechar o polígono.
+            </p>
+          </div>
+        )}
+        {createError && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-md shadow px-3 py-2 text-xs max-w-xs">
+            {createError}
+          </div>
+        )}
+        {createPlot.isPending && (
+          <div className="bg-background/95 border border-border rounded-md shadow px-3 py-1.5 text-xs text-muted-foreground">
+            Gardando parcela...
+          </div>
         )}
       </div>
 

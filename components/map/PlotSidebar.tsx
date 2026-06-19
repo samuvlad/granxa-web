@@ -9,7 +9,26 @@ interface PlotSidebarProps {
   editingPlotId: number | null;
   onEditingChange: (id: number | null) => void;
   isCreatingNew: boolean;
+  draftName: string;
+  draftColor: string;
+  draftNotes: string;
+  onDraftChange: (updates: {
+    name?: string;
+    color?: string;
+    notes?: string;
+  }) => void;
+  onCancelCreate: () => void;
 }
+
+const PARCEL_COLORS: { value: string; label: string }[] = [
+  { value: "#22c55e", label: "Verde (pasto)" },
+  { value: "#84cc16", label: "Lima" },
+  { value: "#eab308", label: "Amarelo" },
+  { value: "#f59e0b", label: "Laranxa" },
+  { value: "#ef4444", label: "Vermello" },
+  { value: "#a855f7", label: "Morado" },
+  { value: "#3b82f6", label: "Azul" },
+];
 
 export function PlotSidebar({
   selectedPlotId,
@@ -17,6 +36,11 @@ export function PlotSidebar({
   editingPlotId,
   onEditingChange,
   isCreatingNew,
+  draftName,
+  draftColor,
+  draftNotes,
+  onDraftChange,
+  onCancelCreate,
 }: PlotSidebarProps) {
   const { data: plots = [], isLoading } = usePlots();
   const updatePlot = useUpdatePlot();
@@ -82,12 +106,20 @@ export function PlotSidebar({
 
       <section className="p-4 border-b border-border">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-          {selectedPlot ? "Editar" : "Información"}
+          {isCreatingNew
+            ? "Nova parcela"
+            : selectedPlot
+              ? "Editar"
+              : "Información"}
         </h3>
         {isCreatingNew ? (
-          <p className="text-sm text-muted-foreground">
-            Debuxa a parcela no mapa. Os detalles aparecerán ao rematar.
-          </p>
+          <NewPlotForm
+            draftName={draftName}
+            draftColor={draftColor}
+            draftNotes={draftNotes}
+            onDraftChange={onDraftChange}
+            onCancel={onCancelCreate}
+          />
         ) : selectedPlot ? (
           <div className="space-y-3">
             <div>
@@ -114,7 +146,7 @@ export function PlotSidebar({
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">
-                Notas
+                Observacións
               </label>
               <textarea
                 value={notes}
@@ -144,10 +176,10 @@ export function PlotSidebar({
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                disabled={updatePlot.isPending}
+                disabled={updatePlot.isPending || !name.trim()}
                 className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               >
-                Gardar
+                {updatePlot.isPending ? "Gardando..." : "Gardar"}
               </button>
               <button
                 onClick={handleDelete}
@@ -216,5 +248,111 @@ export function PlotSidebar({
         )}
       </section>
     </aside>
+  );
+}
+
+function NewPlotForm({
+  draftName,
+  draftColor,
+  draftNotes,
+  onDraftChange,
+  onCancel,
+}: {
+  draftName: string;
+  draftColor: string;
+  draftNotes: string;
+  onDraftChange: (updates: {
+    name?: string;
+    color?: string;
+    notes?: string;
+  }) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 text-xs text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">Como debuxar</p>
+        <ol className="list-decimal list-inside space-y-0.5">
+          <li>Define o nome, a cor e as observacións.</li>
+          <li>Fai clic no mapa para colocar os vértices.</li>
+          <li>Fai clic no primeiro vértice para pechar o polígono.</li>
+        </ol>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Nome <span className="text-destructive">*</span>
+        </label>
+        <input
+          type="text"
+          value={draftName}
+          onChange={(e) => onDraftChange({ name: e.target.value })}
+          placeholder="Ex.: Pasto do río"
+          className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background"
+          autoFocus
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Cor</label>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {PARCEL_COLORS.map((c) => {
+            const active =
+              c.value.toLowerCase() === (draftColor || "").toLowerCase();
+            return (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => onDraftChange({ color: c.value })}
+                className={`w-7 h-7 rounded-md border-2 transition-all ${
+                  active
+                    ? "border-foreground scale-110"
+                    : "border-transparent hover:scale-105"
+                }`}
+                style={{ backgroundColor: c.value }}
+                title={c.label}
+                aria-label={c.label}
+              />
+            );
+          })}
+          <label
+            className="w-7 h-7 rounded-md border border-input overflow-hidden cursor-pointer relative"
+            title="Cor personalizada"
+          >
+            <span
+              className="absolute inset-0.5 rounded-sm"
+              style={{ backgroundColor: draftColor }}
+            />
+            <input
+              type="color"
+              value={draftColor}
+              onChange={(e) => onDraftChange({ color: e.target.value })}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Observacións
+        </label>
+        <textarea
+          value={draftNotes}
+          onChange={(e) => onDraftChange({ notes: e.target.value })}
+          rows={3}
+          placeholder="Notas, manexo, accesos…"
+          className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background resize-none"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={onCancel}
+        className="w-full px-3 py-1.5 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted"
+      >
+        Cancelar creación
+      </button>
+    </div>
   );
 }

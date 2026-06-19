@@ -23,6 +23,26 @@ export default function ParcelasPage() {
 
   const handleCancelCreate = () => {
     setIsCreatingNew(false);
+    setDraftName("");
+    setDraftColor("#3388ff");
+    setDraftNotes("");
+  };
+
+  const handleCompleteCreate = () => {
+    setIsCreatingNew(false);
+    setDraftName("");
+    setDraftColor("#3388ff");
+    setDraftNotes("");
+  };
+
+  const handleDraftChange = (updates: {
+    name?: string;
+    color?: string;
+    notes?: string;
+  }) => {
+    if (updates.name !== undefined) setDraftName(updates.name);
+    if (updates.color !== undefined) setDraftColor(updates.color);
+    if (updates.notes !== undefined) setDraftNotes(updates.notes);
   };
 
   return (
@@ -33,6 +53,11 @@ export default function ParcelasPage() {
         editingPlotId={editingPlotId}
         onEditingChange={setEditingPlotId}
         isCreatingNew={isCreatingNew}
+        draftName={draftName}
+        draftColor={draftColor}
+        draftNotes={draftNotes}
+        onDraftChange={handleDraftChange}
+        onCancelCreate={handleCancelCreate}
       />
       <MapView
         selectedPlotId={selectedPlotId}
@@ -42,6 +67,7 @@ export default function ParcelasPage() {
         isCreatingNew={isCreatingNew}
         onStartCreate={handleStartCreate}
         onCancelCreate={handleCancelCreate}
+        onCompleteCreate={handleCompleteCreate}
         draftName={draftName}
         draftColor={draftColor}
         draftNotes={draftNotes}
