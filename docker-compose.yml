@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_USE_MOCKS: "true"
+    image: granxa-web:latest
+    container_name: granxa-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped

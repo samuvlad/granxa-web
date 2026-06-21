@@ -7,8 +7,8 @@ import { api } from "@/lib/api";
 import { installApiMocks } from "@/lib/api-mock";
 
 const USE_MOCKS =
-  process.env.NEXT_PUBLIC_USE_MOCKS === "true" ||
-  process.env.NEXT_PUBLIC_USE_MOCKS === "1";
+  process.env.NEXT_PUBLIC_USE_MOCKS !== "false" &&
+  process.env.NEXT_PUBLIC_USE_MOCKS !== "0";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

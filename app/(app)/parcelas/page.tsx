@@ -46,7 +46,7 @@ export default function ParcelasPage() {
   };
 
   return (
-    <main className="grid h-full w-full grid-cols-[20rem_1fr] overflow-hidden">
+    <main className="grid h-full w-full grid-cols-[20rem_1fr] grid-rows-[100vh] overflow-hidden">
       <PlotSidebar
         selectedPlotId={selectedPlotId}
         onSelectPlot={setSelectedPlotId}

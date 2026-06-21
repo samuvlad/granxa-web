@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePlots, useUpdatePlot, useDeletePlot } from "@/lib/queries";
+import type { Plot } from "@/types";
 
 interface PlotSidebarProps {
   selectedPlotId: number | null;
@@ -48,22 +49,6 @@ export function PlotSidebar({
 
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
   const sortedPlots = [...plots].sort((a, b) => a.id - b.id);
-  const [name, setName] = useState("");
-  const [color, setColor] = useState("#3388ff");
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    if (isCreatingNew) return;
-    if (selectedPlot) {
-      setName(selectedPlot.name);
-      setColor(selectedPlot.color);
-      setNotes(selectedPlot.notes || "");
-    } else {
-      setName("");
-      setColor("#3388ff");
-      setNotes("");
-    }
-  }, [selectedPlot, isCreatingNew]);
 
   const handleSelect = (id: number) => {
     onSelectPlot(id);
@@ -73,27 +58,10 @@ export function PlotSidebar({
     onSelectPlot(null);
   };
 
-  const handleSave = () => {
-    if (!selectedPlotId) return;
-    updatePlot.mutate({
-      id: selectedPlotId,
-      plot: { name, color, notes: notes || null },
-    });
-    if (editingPlotId === selectedPlotId) {
-      onEditingChange(null);
-    }
-  };
-
-  const handleDelete = () => {
-    if (!selectedPlotId) return;
+  const handleDelete = (id: number) => {
     if (!confirm("Eliminar a parcela seleccionada?")) return;
-    deletePlot.mutate(selectedPlotId);
+    deletePlot.mutate(id);
     handleClear();
-  };
-
-  const handleToggleEdit = () => {
-    if (!selectedPlotId) return;
-    onEditingChange(editingPlotId === selectedPlotId ? null : selectedPlotId);
   };
 
   return (
@@ -121,87 +89,31 @@ export function PlotSidebar({
             onCancel={onCancelCreate}
           />
         ) : selectedPlot ? (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">
-                Nome
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">
-                Cor
-              </label>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-full h-9 border border-input rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">
-                Observacións
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background resize-none"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="bg-muted p-2 rounded-md">
-                <span className="text-muted-foreground text-xs">Área</span>
-                <p className="font-medium">
-                  {selectedPlot.area_m2
-                    ? `${selectedPlot.area_m2.toFixed(2)} m²`
-                    : "-"}
-                </p>
-              </div>
-              <div className="bg-muted p-2 rounded-md">
-                <span className="text-muted-foreground text-xs">Perímetro</span>
-                <p className="font-medium">
-                  {selectedPlot.perimeter_m
-                    ? `${selectedPlot.perimeter_m.toFixed(2)} m`
-                    : "-"}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSave}
-                disabled={updatePlot.isPending || !name.trim()}
-                className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-              >
-                {updatePlot.isPending ? "Gardando..." : "Gardar"}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deletePlot.isPending}
-                className="px-3 py-1.5 bg-destructive/10 text-destructive border border-destructive/20 rounded-md text-sm font-medium hover:bg-destructive/20 disabled:opacity-50"
-              >
-                Eliminar
-              </button>
-            </div>
-            <button
-              onClick={handleToggleEdit}
-              className={`w-full px-3 py-1.5 rounded-md text-sm font-medium border ${
-                editingPlotId === selectedPlotId
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-foreground border-border hover:bg-muted"
-              }`}
-            >
-              {editingPlotId === selectedPlotId
-                ? "Rematar edición"
-                : "Editar xeometría"}
-            </button>
-          </div>
+          <PlotEditForm
+            key={selectedPlot.id}
+            plot={selectedPlot}
+            editing={editingPlotId === selectedPlot.id}
+            onSave={(data) => {
+              updatePlot.mutate(
+                { id: selectedPlot.id, plot: data },
+                {
+                  onSuccess: () => {
+                    if (editingPlotId === selectedPlot.id) {
+                      onEditingChange(null);
+                    }
+                  },
+                }
+              );
+            }}
+            onDelete={() => handleDelete(selectedPlot.id)}
+            onToggleEdit={() =>
+              onEditingChange(
+                editingPlotId === selectedPlot.id ? null : selectedPlot.id
+              )
+            }
+            savePending={updatePlot.isPending}
+            deletePending={deletePlot.isPending}
+          />
         ) : (
           <p className="text-sm text-muted-foreground">
             Selecciona unha parcela no mapa ou na lista para ver os detalles.
@@ -248,6 +160,104 @@ export function PlotSidebar({
         )}
       </section>
     </aside>
+  );
+}
+
+function PlotEditForm({
+  plot,
+  editing,
+  onSave,
+  onDelete,
+  onToggleEdit,
+  savePending,
+  deletePending,
+}: {
+  plot: Plot;
+  editing: boolean;
+  onSave: (data: { name: string; color: string; notes: string | null }) => void;
+  onDelete: () => void;
+  onToggleEdit: () => void;
+  savePending: boolean;
+  deletePending: boolean;
+}) {
+  const [name, setName] = useState(plot.name);
+  const [color, setColor] = useState(plot.color);
+  const [notes, setNotes] = useState(plot.notes ?? "");
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Nome
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Cor</label>
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="w-full h-9 border border-input rounded-md"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Observacións
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background resize-none"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="bg-muted p-2 rounded-md">
+          <span className="text-muted-foreground text-xs">Área</span>
+          <p className="font-medium">
+            {plot.area_m2 ? `${plot.area_m2.toFixed(2)} m²` : "-"}
+          </p>
+        </div>
+        <div className="bg-muted p-2 rounded-md">
+          <span className="text-muted-foreground text-xs">Perímetro</span>
+          <p className="font-medium">
+            {plot.perimeter_m ? `${plot.perimeter_m.toFixed(2)} m` : "-"}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onSave({ name, color, notes: notes || null })}
+          disabled={savePending || !name.trim()}
+          className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+        >
+          {savePending ? "Gardando..." : "Gardar"}
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={deletePending}
+          className="px-3 py-1.5 bg-destructive/10 text-destructive border border-destructive/20 rounded-md text-sm font-medium hover:bg-destructive/20 disabled:opacity-50"
+        >
+          Eliminar
+        </button>
+      </div>
+      <button
+        onClick={onToggleEdit}
+        className={`w-full px-3 py-1.5 rounded-md text-sm font-medium border ${
+          editing
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background text-foreground border-border hover:bg-muted"
+        }`}
+      >
+        {editing ? "Rematar edición" : "Editar xeometría"}
+      </button>
+    </div>
   );
 }
 

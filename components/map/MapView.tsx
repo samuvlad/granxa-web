@@ -1,9 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type * as L from "leaflet";
 import { usePlots, useCreatePlot, useUpdatePlot, useDeletePlot } from "@/lib/queries";
 import { getApiErrorMessage } from "@/lib/api";
-import { Plot, PlotUpdate } from "@/types";
+
+type LeafletNS = typeof import("leaflet");
+type PmShape = L.PM.SUPPORTED_SHAPES;
+
+interface PmLayerEdit {
+  enabled?: () => boolean;
+  disable: () => void;
+  enable: (opts?: {
+    snappable?: boolean;
+    snapDistance?: number;
+    allowSelfIntersection?: boolean;
+    draggable?: boolean;
+  }) => void;
+}
+
+interface EditableLayer extends L.Layer {
+  _plotId?: number;
+  pm?: PmLayerEdit;
+  toGeoJSON: () => GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>;
+  setStyle?: (style: L.PathOptions) => void;
+  getBounds?: () => L.LatLngBounds;
+}
+
+interface MapCallbacks {
+  onSelectPlot: (id: number | null) => void;
+  onCompleteCreate: () => void;
+  createPlot: ReturnType<typeof useCreatePlot>;
+  updatePlot: ReturnType<typeof useUpdatePlot>;
+  deletePlot: ReturnType<typeof useDeletePlot>;
+}
 
 interface MapViewProps {
   selectedPlotId: number | null;
@@ -19,6 +49,30 @@ interface MapViewProps {
   draftNotes: string;
 }
 
+const TRANSLATIONS: L.PM.Translations = {
+  tooltips: {
+    placeMarker: "Fai clic para colocar un marcador",
+    firstVertex: "Fai clic para colocar o primeiro vértice",
+    continueLine: "Fai clic para continuar debuxando",
+    finishLine: "Fai clic nun vértice existente para rematar",
+    finishPoly: "Fai clic no primeiro vértice para rematar",
+    finishRect: "Fai clic para rematar o rectángulo",
+    startCircle: "Fai clic para colocar o centro do círculo",
+    finishCircle: "Fai clic para rematar o círculo",
+  },
+  actions: {
+    finish: "Rematar",
+    cancel: "Cancelar",
+    removeLastVertex: "Eliminar último vértice",
+  },
+  buttonTitles: {
+    drawPolyButton: "Debuxar polígono",
+    editButton: "Editar capas",
+    dragButton: "Mover capas",
+    deleteButton: "Eliminar capas",
+  },
+};
+
 export function MapView({
   selectedPlotId,
   onSelectPlot,
@@ -33,12 +87,11 @@ export function MapView({
   draftNotes,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const layerGroupRef = useRef<any>(null);
-  const LRef = useRef<any>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const LRef = useRef<LeafletNS | null>(null);
 
   const [isReady, setIsReady] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const { data: plots = [], isLoading } = usePlots();
@@ -51,14 +104,29 @@ export function MapView({
     draftRef.current = { name: draftName, color: draftColor, notes: draftNotes };
   }, [draftName, draftColor, draftNotes]);
 
-  // Inicializar mapa
+  const callbacksRef = useRef<MapCallbacks>({
+    onSelectPlot,
+    onCompleteCreate,
+    createPlot,
+    updatePlot,
+    deletePlot,
+  });
+  useEffect(() => {
+    callbacksRef.current = {
+      onSelectPlot,
+      onCompleteCreate,
+      createPlot,
+      updatePlot,
+      deletePlot,
+    };
+  });
+
   useEffect(() => {
     let isMounted = true;
+    const mapEl = mapRef.current;
+    if (!mapEl) return;
 
     async function initMap() {
-      if (!mapRef.current) return;
-
-      console.log("[MapView] Inicializando mapa...");
       const L = await import("leaflet");
       await import("@geoman-io/leaflet-geoman-free");
       if (!isMounted || !mapRef.current) {
@@ -117,7 +185,6 @@ export function MapView({
       const layerGroup = L.layerGroup().addTo(map);
       layerGroupRef.current = layerGroup;
 
-      // Configurar Geoman
       map.pm.addControls({
         position: "topright",
         drawMarker: false,
@@ -134,36 +201,15 @@ export function MapView({
         cutPolygon: false,
       });
 
-      const translations: any = {
-        tooltips: {
-          placeMarker: "Fai clic para colocar un marcador",
-          firstVertex: "Fai clic para colocar o primeiro vértice",
-          continueLine: "Fai clic para continuar debuxando",
-          finishLine: "Fai clic nun vértice existente para rematar",
-          finishPoly: "Fai clic no primeiro vértice para rematar",
-          finishRect: "Fai clic para rematar o rectángulo",
-          startCircle: "Fai clic para colocar o centro do círculo",
-          finishCircle: "Fai clic para rematar o círculo",
-        },
-        actions: {
-          finish: "Rematar",
-          cancel: "Cancelar",
-          removeLastVertex: "Eliminar último vértice",
-        },
-        buttonTitles: {
-          drawPolyButton: "Debuxar polígono",
-          editButton: "Editar capas",
-          dragButton: "Mover capas",
-          deleteButton: "Eliminar capas",
-        },
-      };
-      map.pm.setLang("gl" as any, translations, "en" as any);
+      // Geoman non inclúe "gl" (galego) nas súas localizacións integradas.
+      // Usamos "es" como base (lingua máis próxima) e sobreescribimos
+      // as cadeas con traducións propias ao galego.
+      map.pm.setLang("es", TRANSLATIONS, "en");
 
-      // Evento: crear polígono
-      map.on("pm:create", (e: any) => {
+      const onCreate = (e: { shape: PmShape; layer: L.Layer }) => {
         if (e.shape !== "Polygon") return;
 
-        const layer = e.layer;
+        const layer = e.layer as EditableLayer;
         const draft = draftRef.current;
         const trimmedName = (draft.name || "").trim();
 
@@ -176,7 +222,7 @@ export function MapView({
         const geojson = layer.toGeoJSON();
 
         setCreateError(null);
-        createPlot.mutate(
+        callbacksRef.current.createPlot.mutate(
           {
             name: trimmedName,
             color: draft.color,
@@ -185,8 +231,8 @@ export function MapView({
           },
           {
             onSuccess: (newPlot) => {
-              onCompleteCreate();
-              onSelectPlot(newPlot.id);
+              callbacksRef.current.onCompleteCreate();
+              callbacksRef.current.onSelectPlot(newPlot.id);
             },
             onError: (err) => {
               setCreateError(getApiErrorMessage(err, "Non se puido gardar a parcela"));
@@ -194,55 +240,50 @@ export function MapView({
           }
         );
 
-        // Eliminar a capa temporal de Geoman, recargaremos dende o servidor
         layerGroup.removeLayer(layer);
-      });
+      };
 
-      // Evento: editar polígono
-      map.on("pm:edit", (e: any) => {
-        const layer = e.layer;
+      const onEdit = (e: { layer: L.Layer }) => {
+        const layer = e.layer as EditableLayer;
         const plotId = layer._plotId;
         if (!plotId) return;
 
         const geojson = layer.toGeoJSON();
-        updatePlot.mutate({
+        callbacksRef.current.updatePlot.mutate({
           id: plotId,
-          plot: {
-            geometry: geojson.geometry as GeoJSON.Polygon,
-          },
+          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
         });
-      });
+      };
 
-      // Evento: arrastrar polígono
-      map.on("pm:dragend", (e: any) => {
-        const layer = e.layer;
+      const onDragEnd = (e: { layer: L.Layer }) => {
+        const layer = e.layer as EditableLayer;
         const plotId = layer._plotId;
         if (!plotId) return;
 
         const geojson = layer.toGeoJSON();
-        updatePlot.mutate({
+        callbacksRef.current.updatePlot.mutate({
           id: plotId,
-          plot: {
-            geometry: geojson.geometry as GeoJSON.Polygon,
-          },
+          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
         });
-      });
+      };
 
-      // Evento: eliminar polígono dende Geoman
-      map.on("pm:remove", (e: any) => {
-        const plotId = e.layer._plotId;
+      const onRemove = (e: { layer: L.Layer }) => {
+        const layer = e.layer as EditableLayer;
+        const plotId = layer._plotId;
         if (plotId) {
-          deletePlot.mutate(plotId);
+          callbacksRef.current.deletePlot.mutate(plotId);
         }
-      });
+      };
+
+      map.on("pm:create", onCreate);
+      map.on("pm:edit", onEdit);
+      map.on("pm:dragend", onDragEnd);
+      map.on("pm:remove", onRemove);
 
       setIsReady(true);
 
-      // Asegurar que Leaflet recalcula o tamaño do contedor
       setTimeout(() => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
-        }
+        mapInstanceRef.current?.invalidateSize();
       }, 100);
     }
 
@@ -259,16 +300,16 @@ export function MapView({
     };
   }, []);
 
-  // Renderizar parcelas cando cambian (diff: conserva capas e estado pm)
   useEffect(() => {
     if (!isReady || !layerGroupRef.current || !LRef.current) return;
 
     const L = LRef.current;
     const layerGroup = layerGroupRef.current;
 
-    const existing = new Map<number, any>();
-    layerGroup.eachLayer((layer: any) => {
-      if (layer._plotId != null) existing.set(layer._plotId, layer);
+    const existing = new Map<number, EditableLayer>();
+    layerGroup.eachLayer((layer) => {
+      const editable = layer as EditableLayer;
+      if (editable._plotId != null) existing.set(editable._plotId, editable);
     });
 
     const newIds = new Set(plots.map((p) => p.id));
@@ -296,19 +337,19 @@ export function MapView({
         pmIgnore: false,
       });
 
-      const layer = geoJsonLayer.getLayers()[0];
+      const layer = geoJsonLayer.getLayers()[0] as EditableLayer | undefined;
       if (!layer) return;
 
       layer._plotId = plot.id;
 
-      layer.on("click", (e: any) => {
+      layer.on("click", (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
-        onSelectPlot(plot.id);
+        callbacksRef.current.onSelectPlot(plot.id);
       });
 
       layer.on("pm:edit", () => {
         const geojson = layer.toGeoJSON();
-        updatePlot.mutate({
+        callbacksRef.current.updatePlot.mutate({
           id: plot.id,
           plot: { geometry: geojson.geometry as GeoJSON.Polygon },
         });
@@ -316,7 +357,7 @@ export function MapView({
 
       layer.on("pm:dragend", () => {
         const geojson = layer.toGeoJSON();
-        updatePlot.mutate({
+        callbacksRef.current.updatePlot.mutate({
           id: plot.id,
           plot: { geometry: geojson.geometry as GeoJSON.Polygon },
         });
@@ -326,17 +367,18 @@ export function MapView({
     });
   }, [plots, isReady]);
 
-  // Zoom a parcela seleccionada
   useEffect(() => {
     if (!mapInstanceRef.current || !selectedPlotId) return;
     const plot = plots.find((p) => p.id === selectedPlotId);
     if (!plot) return;
 
     const layer = layerGroupRef.current
-      .getLayers()
-      .find((l: any) => l._plotId === selectedPlotId);
+      ?.getLayers()
+      .find((l) => (l as EditableLayer)._plotId === selectedPlotId) as
+      | EditableLayer
+      | undefined;
 
-    if (layer && layer.getBounds) {
+    if (layer?.getBounds) {
       mapInstanceRef.current.fitBounds(layer.getBounds(), {
         padding: [40, 40],
         maxZoom: 19,
@@ -344,22 +386,24 @@ export function MapView({
     }
   }, [selectedPlotId, plots]);
 
-  // Activar/desactivar edición só na capa correspondente
   useEffect(() => {
     if (!isReady || !layerGroupRef.current) return;
     const layerGroup = layerGroupRef.current;
 
-    layerGroup.eachLayer((layer: any) => {
-      if (layer.pm && layer.pm.enabled?.()) {
-        layer.pm.disable();
+    layerGroup.eachLayer((layer) => {
+      const editable = layer as EditableLayer;
+      if (editable.pm?.enabled?.()) {
+        editable.pm.disable();
       }
     });
 
     if (editingPlotId) {
       const layer = layerGroup
         .getLayers()
-        .find((l: any) => l._plotId === editingPlotId);
-      if (layer && layer.pm) {
+        .find((l) => (l as EditableLayer)._plotId === editingPlotId) as
+        | EditableLayer
+        | undefined;
+      if (layer?.pm) {
         layer.pm.enable({
           snappable: true,
           snapDistance: 20,
@@ -380,13 +424,11 @@ export function MapView({
       snappable: true,
       snapDistance: 20,
     });
-    setIsDrawing(true);
   };
 
   const handleCancelDraw = () => {
     if (!mapInstanceRef.current) return;
     mapInstanceRef.current.pm.disableDraw();
-    setIsDrawing(false);
     setCreateError(null);
     onCancelCreate();
   };
