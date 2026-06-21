@@ -3,11 +3,18 @@ services:
     build:
       context: .
       args:
-        NEXT_PUBLIC_USE_MOCKS: "true"
-    image: granxa-web:latest
+        NEXT_PUBLIC_USE_MOCKS: "false"
+    image: granxa-web:dev
     container_name: granxa-web
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
+      NEXT_PUBLIC_USE_MOCKS: "false"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
     restart: unless-stopped

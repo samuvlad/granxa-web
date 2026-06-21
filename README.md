@@ -6,8 +6,8 @@ pastoreo.
 
 ## Arranque rápido con Docker (recomendado)
 
-A app inclúe unha configuración Docker autocontida con **mocks activados por
-defecto**, polo que funciona sen backend.
+A app inclúe unha configuración Docker de **desenvolvemento** con HMR: o
+código móntase como volume e os cambios reflíctense en vivo no navegador.
 
 ```bash
 docker compose up --build
@@ -22,8 +22,14 @@ Comandos útiles:
 docker compose up --build -d      # arrancar en segundo plano
 docker compose logs -f app        # seguir logs
 docker compose down               # parar
-docker compose up --build --force-recreate  # rebuild tras cambios
+docker compose restart app        # reiniciar (útil se HMR non recolle cambios)
+docker compose exec app sh        # abrir unha shell no contedor
 ```
+
+> Como o código está montado como volume, **non** necesitas facer rebuild
+> tras editar ficheiros. Rebuild só é necesario se cambias
+> `package.json`/`package-lock.json` (para reinstalar dependencias) ou o
+> propio `Dockerfile`.
 
 ## Arranque en desenvolvemento (sen Docker)
 
@@ -59,6 +65,7 @@ NEXT_PUBLIC_USE_MOCKS=false NEXT_PUBLIC_API_URL=https://api.example.com npm run 
 #   args:
 #     NEXT_PUBLIC_USE_MOCKS: "false"
 #   environment:
+#     NEXT_PUBLIC_USE_MOCKS: "false"
 #     NEXT_PUBLIC_API_URL: https://api.example.com
 ```
 

@@ -175,7 +175,12 @@ function RotationFormBody({
                 onValueChange={(v) => setLoteId(v ?? "")}
               >
                 <SelectTrigger id="lote" className="w-full">
-                  <SelectValue placeholder="Selecciona lote" />
+                  <SelectValue placeholder="Selecciona lote">
+                    {loteId
+                      ? lotes.find((l) => String(l.id) === loteId)?.name ??
+                        "Selecciona lote"
+                      : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {lotes.length === 0 ? (
@@ -211,7 +216,12 @@ function RotationFormBody({
               onValueChange={(v) => setParcelaId(v ?? "")}
             >
               <SelectTrigger id="parcela" className="w-full">
-                <SelectValue placeholder="Selecciona parcela" />
+                <SelectValue placeholder="Selecciona parcela">
+                  {parcelaId
+                    ? plots.find((p) => String(p.id) === parcelaId)?.name ??
+                      "Selecciona parcela"
+                    : null}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {plots.length === 0 ? (

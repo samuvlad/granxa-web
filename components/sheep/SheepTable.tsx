@@ -93,7 +93,13 @@ export function SheepTable({
           onValueChange={(v) => setSexFilter(v as Sexo | typeof ALL)}
         >
           <SelectTrigger className="w-36">
-            <SelectValue />
+            <SelectValue>
+              {sexFilter === ALL
+                ? "Todos os sexos"
+                : sexFilter === "femia"
+                  ? "Femias"
+                  : "Machos"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os sexos</SelectItem>
@@ -106,7 +112,15 @@ export function SheepTable({
           onValueChange={(v) => setStatusFilter(v as EstadoAnimal | typeof ALL)}
         >
           <SelectTrigger className="w-40">
-            <SelectValue />
+            <SelectValue>
+              {statusFilter === ALL
+                ? "Todos os estados"
+                : statusFilter === "activo"
+                  ? "Activos"
+                  : statusFilter === "vendido"
+                    ? "Vendidos"
+                    : "Mertos"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os estados</SelectItem>
@@ -120,7 +134,13 @@ export function SheepTable({
           onValueChange={(v) => setLoteFilter(v ?? ALL)}
         >
           <SelectTrigger className="w-48">
-            <SelectValue />
+            <SelectValue>
+              {loteFilter === ALL
+                ? "Todos os lotes"
+                : loteFilter === NO_LOTE
+                  ? "Sen lote"
+                  : loteById.get(Number(loteFilter))?.name ?? "Todos os lotes"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os lotes</SelectItem>

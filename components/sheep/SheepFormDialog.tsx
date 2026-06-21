@@ -212,7 +212,7 @@ function SheepFormBody({
           <Label htmlFor="sexo">Sexo</Label>
           <Select value={sexo} onValueChange={(v) => setSexo(v as Sexo)}>
             <SelectTrigger id="sexo" className="w-full">
-              <SelectValue />
+              <SelectValue>{sexo === "femia" ? "Femia" : "Macho"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {SEXO_VALUES.map((s) => (
@@ -242,7 +242,11 @@ function SheepFormBody({
             onValueChange={(v) => setLoteId(v ?? "")}
           >
             <SelectTrigger id="lote" className="w-full">
-              <SelectValue placeholder="Sen asignar" />
+              <SelectValue placeholder="Sen asignar">
+                {loteId
+                  ? lotes.find((l) => String(l.id) === loteId)?.name ?? "Sen asignar"
+                  : null}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Sen asignar</SelectItem>
@@ -265,7 +269,13 @@ function SheepFormBody({
             onValueChange={(v) => setEstado(v as EstadoAnimal)}
           >
             <SelectTrigger id="estado" className="w-full">
-              <SelectValue />
+              <SelectValue>
+                {estado === "activo"
+                  ? "Activo"
+                  : estado === "vendido"
+                    ? "Vendido"
+                    : "Morto"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {ESTADO_VALUES.map((s) => (
@@ -288,7 +298,17 @@ function SheepFormBody({
             onValueChange={(v) => setNaiId(v ?? "")}
           >
             <SelectTrigger id="nai" className="w-full">
-              <SelectValue placeholder="Sen asignar" />
+              <SelectValue placeholder="Sen asignar">
+                {naiId
+                  ? possibleParents
+                      .filter((s) => s.sexo === "femia")
+                      .find((s) => String(s.id) === naiId)?.nome ??
+                    possibleParents
+                      .filter((s) => s.sexo === "femia")
+                      .find((s) => String(s.id) === naiId)?.crotal ??
+                    "Sen asignar"
+                  : null}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Sen asignar</SelectItem>
@@ -310,7 +330,17 @@ function SheepFormBody({
             onValueChange={(v) => setPaiId(v ?? "")}
           >
             <SelectTrigger id="pai" className="w-full">
-              <SelectValue placeholder="Sen asignar" />
+              <SelectValue placeholder="Sen asignar">
+                {paiId
+                  ? possibleParents
+                      .filter((s) => s.sexo === "macho")
+                      .find((s) => String(s.id) === paiId)?.nome ??
+                    possibleParents
+                      .filter((s) => s.sexo === "macho")
+                      .find((s) => String(s.id) === paiId)?.crotal ??
+                    "Sen asignar"
+                  : null}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Sen asignar</SelectItem>
