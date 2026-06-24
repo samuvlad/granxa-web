@@ -2,11 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import type * as L from "leaflet";
-import { usePlots, useCreatePlot, useUpdatePlot, useDeletePlot } from "@/lib/queries";
+import {
+  useCreatePlot,
+  useDeletePlot,
+  usePlots,
+  useUpdatePlot,
+} from "@/lib/queries";
 import { getApiErrorMessage } from "@/lib/api";
+import type { Plot } from "@/types";
+import type { useMapDraft } from "@/app/(app)/parcelas/_hooks/use-map-draft";
 
 type LeafletNS = typeof import("leaflet");
-type PmShape = L.PM.SUPPORTED_SHAPES;
 
 interface PmLayerEdit {
   enabled?: () => boolean;
@@ -44,9 +50,7 @@ interface MapViewProps {
   onStartCreate: () => void;
   onCancelCreate: () => void;
   onCompleteCreate: () => void;
-  draftName: string;
-  draftColor: string;
-  draftNotes: string;
+  draft: ReturnType<typeof useMapDraft>;
 }
 
 const TRANSLATIONS: L.PM.Translations = {
@@ -73,6 +77,19 @@ const TRANSLATIONS: L.PM.Translations = {
   },
 };
 
+const TILE_LAYERS = {
+  osm: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contribuidores',
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+  },
+} as const;
+
 export function MapView({
   selectedPlotId,
   onSelectPlot,
@@ -82,9 +99,7 @@ export function MapView({
   onStartCreate,
   onCancelCreate,
   onCompleteCreate,
-  draftName,
-  draftColor,
-  draftNotes,
+  draft,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -99,11 +114,9 @@ export function MapView({
   const updatePlot = useUpdatePlot();
   const deletePlot = useDeletePlot();
 
-  const draftRef = useRef({ name: draftName, color: draftColor, notes: draftNotes });
-  useEffect(() => {
-    draftRef.current = { name: draftName, color: draftColor, notes: draftNotes };
-  }, [draftName, draftColor, draftNotes]);
-
+  // Mantemos un ref sempre actualizado dos callbacks máis recentes para
+  // que o effect de inicialización (que só corre unha vez) poida utilizalos
+  // sen volverse a subscribir a eventos de Leaflet.
   const callbacksRef = useRef<MapCallbacks>({
     onSelectPlot,
     onCompleteCreate,
@@ -121,61 +134,50 @@ export function MapView({
     };
   });
 
+  // O mesmo patrón aplícase ao `draft`: o effect de inicialización do mapa
+  // corre unha vez, pero o handler de `pm:create` necesita o valor máis recente.
+  const draftRef = useRef(draft);
   useEffect(() => {
-    let isMounted = true;
+    draftRef.current = draft;
+  });
+
+  useEffect(() => {
     const mapEl = mapRef.current;
     if (!mapEl) return;
+
+    let cancelled = false;
 
     async function initMap() {
       const L = await import("leaflet");
       await import("@geoman-io/leaflet-geoman-free");
-      if (!isMounted || !mapRef.current) {
-        console.log("[MapView] Componente desmontado antes de inicializar");
-        return;
-      }
-      console.log("[MapView] Leaflet e Geoman cargados");
+      if (cancelled || !mapRef.current) return;
 
       LRef.current = L;
 
       const map = L.map(mapRef.current).setView([42.8, -8.0], 8);
       mapInstanceRef.current = map;
 
-      const recenterOnUser = () => {
-        if (!navigator.geolocation) return;
+      if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const { latitude, longitude } = pos.coords;
             mapInstanceRef.current?.setView([latitude, longitude], 19);
           },
-          (err) => {
-            console.warn("[MapView] Geolocation non dispoñible:", err.message);
-          },
+          undefined,
           { enableHighAccuracy: true, timeout: 10000 }
         );
-      };
+      }
 
-      recenterOnUser();
-
-      const osm = L.tileLayer(
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contribuidores',
-          maxZoom: 19,
-        }
-      );
-
-      const satellite = L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        {
-          attribution:
-            "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-          maxZoom: 19,
-        }
-      );
+      const osm = L.tileLayer(TILE_LAYERS.osm.url, {
+        attribution: TILE_LAYERS.osm.attribution,
+        maxZoom: 19,
+      });
+      const satellite = L.tileLayer(TILE_LAYERS.satellite.url, {
+        attribution: TILE_LAYERS.satellite.attribution,
+        maxZoom: 19,
+      });
 
       osm.addTo(map);
-
       L.control.layers(
         { Mapa: osm, Satélite: satellite },
         {},
@@ -201,33 +203,26 @@ export function MapView({
         cutPolygon: false,
       });
 
-      // Geoman non inclúe "gl" (galego) nas súas localizacións integradas.
-      // Usamos "es" como base (lingua máis próxima) e sobreescribimos
-      // as cadeas con traducións propias ao galego.
       map.pm.setLang("es", TRANSLATIONS, "en");
 
-      const onCreate = (e: { shape: PmShape; layer: L.Layer }) => {
+      map.on("pm:create", (e: { shape: string; layer: L.Layer }) => {
         if (e.shape !== "Polygon") return;
-
         const layer = e.layer as EditableLayer;
-        const draft = draftRef.current;
-        const trimmedName = (draft.name || "").trim();
-
+        const currentDraft = draftRef.current;
+        const trimmedName = currentDraft.name.trim();
         if (!trimmedName) {
           setCreateError("O nome da parcela é obrigatorio antes de gardala.");
-          mapInstanceRef.current?.removeLayer(layer);
+          map.removeLayer(layer);
           return;
         }
-
         const geojson = layer.toGeoJSON();
-
         setCreateError(null);
         callbacksRef.current.createPlot.mutate(
           {
             name: trimmedName,
-            color: draft.color,
-            notes: (draft.notes || "").trim() || null,
-            geometry: geojson.geometry as GeoJSON.Polygon,
+            color: currentDraft.color,
+            notes: currentDraft.notes.trim() || null,
+            geometry: geojson.geometry,
           },
           {
             onSuccess: (newPlot) => {
@@ -239,145 +234,42 @@ export function MapView({
             },
           }
         );
-
         layerGroup.removeLayer(layer);
-      };
+      });
 
-      const onEdit = (e: { layer: L.Layer }) => {
-        const layer = e.layer as EditableLayer;
-        const plotId = layer._plotId;
-        if (!plotId) return;
-
-        const geojson = layer.toGeoJSON();
-        callbacksRef.current.updatePlot.mutate({
-          id: plotId,
-          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
-        });
-      };
-
-      const onDragEnd = (e: { layer: L.Layer }) => {
-        const layer = e.layer as EditableLayer;
-        const plotId = layer._plotId;
-        if (!plotId) return;
-
-        const geojson = layer.toGeoJSON();
-        callbacksRef.current.updatePlot.mutate({
-          id: plotId,
-          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
-        });
-      };
-
-      const onRemove = (e: { layer: L.Layer }) => {
-        const layer = e.layer as EditableLayer;
-        const plotId = layer._plotId;
-        if (plotId) {
-          callbacksRef.current.deletePlot.mutate(plotId);
-        }
-      };
-
-      map.on("pm:create", onCreate);
-      map.on("pm:edit", onEdit);
-      map.on("pm:dragend", onDragEnd);
-      map.on("pm:remove", onRemove);
+      map.on("pm:remove", (e: { layer: L.Layer }) => {
+        const plotId = (e.layer as EditableLayer)._plotId;
+        if (plotId) callbacksRef.current.deletePlot.mutate(plotId);
+      });
 
       setIsReady(true);
-
-      setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-      }, 100);
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 100);
     }
 
     initMap();
 
     return () => {
-      isMounted = false;
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-        layerGroupRef.current = null;
-        LRef.current = null;
-      }
+      cancelled = true;
+      mapInstanceRef.current?.remove();
+      mapInstanceRef.current = null;
+      layerGroupRef.current = null;
+      LRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     if (!isReady || !layerGroupRef.current || !LRef.current) return;
-
-    const L = LRef.current;
-    const layerGroup = layerGroupRef.current;
-
-    const existing = new Map<number, EditableLayer>();
-    layerGroup.eachLayer((layer) => {
-      const editable = layer as EditableLayer;
-      if (editable._plotId != null) existing.set(editable._plotId, editable);
-    });
-
-    const newIds = new Set(plots.map((p) => p.id));
-    existing.forEach((layer, id) => {
-      if (!newIds.has(id)) layerGroup.removeLayer(layer);
-    });
-
-    plots.forEach((plot) => {
-      const prev = existing.get(plot.id);
-      if (prev && typeof prev.setStyle === "function") {
-        prev.setStyle({
-          color: plot.color,
-          fillColor: plot.color,
-        });
-        return;
-      }
-
-      const geoJsonLayer = L.geoJSON(plot.geometry, {
-        style: {
-          color: plot.color,
-          fillColor: plot.color,
-          fillOpacity: 0.25,
-          weight: 3,
-        },
-        pmIgnore: false,
-      });
-
-      const layer = geoJsonLayer.getLayers()[0] as EditableLayer | undefined;
-      if (!layer) return;
-
-      layer._plotId = plot.id;
-
-      layer.on("click", (e: L.LeafletMouseEvent) => {
-        L.DomEvent.stopPropagation(e);
-        callbacksRef.current.onSelectPlot(plot.id);
-      });
-
-      layer.on("pm:edit", () => {
-        const geojson = layer.toGeoJSON();
-        callbacksRef.current.updatePlot.mutate({
-          id: plot.id,
-          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
-        });
-      });
-
-      layer.on("pm:dragend", () => {
-        const geojson = layer.toGeoJSON();
-        callbacksRef.current.updatePlot.mutate({
-          id: plot.id,
-          plot: { geometry: geojson.geometry as GeoJSON.Polygon },
-        });
-      });
-
-      layerGroup.addLayer(layer);
-    });
+    syncLayers(LRef.current, layerGroupRef.current, plots, callbacksRef);
   }, [plots, isReady]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !selectedPlotId) return;
+    if (!mapInstanceRef.current || selectedPlotId == null) return;
     const plot = plots.find((p) => p.id === selectedPlotId);
     if (!plot) return;
-
-    const layer = layerGroupRef.current
-      ?.getLayers()
-      .find((l) => (l as EditableLayer)._plotId === selectedPlotId) as
-      | EditableLayer
-      | undefined;
-
+    const layer = findLayerByPlotId(
+      layerGroupRef.current,
+      selectedPlotId
+    );
     if (layer?.getBounds) {
       mapInstanceRef.current.fitBounds(layer.getBounds(), {
         padding: [40, 40],
@@ -389,20 +281,12 @@ export function MapView({
   useEffect(() => {
     if (!isReady || !layerGroupRef.current) return;
     const layerGroup = layerGroupRef.current;
-
     layerGroup.eachLayer((layer) => {
       const editable = layer as EditableLayer;
-      if (editable.pm?.enabled?.()) {
-        editable.pm.disable();
-      }
+      if (editable.pm?.enabled?.()) editable.pm.disable();
     });
-
     if (editingPlotId) {
-      const layer = layerGroup
-        .getLayers()
-        .find((l) => (l as EditableLayer)._plotId === editingPlotId) as
-        | EditableLayer
-        | undefined;
+      const layer = findLayerByPlotId(layerGroup, editingPlotId);
       if (layer?.pm) {
         layer.pm.enable({
           snappable: true,
@@ -433,6 +317,24 @@ export function MapView({
     onCancelCreate();
   };
 
+  const drawButton = isCreatingNew ? (
+    <button
+      onClick={handleCancelDraw}
+      disabled={!isReady}
+      className="px-3 py-2 bg-background text-foreground border border-border rounded-md shadow hover:bg-muted disabled:opacity-50 text-sm font-medium"
+    >
+      Cancelar debuxo
+    </button>
+  ) : (
+    <button
+      onClick={handleStartDraw}
+      disabled={!isReady || createPlot.isPending || !!editingPlotId}
+      className="px-3 py-2 bg-primary text-primary-foreground rounded-md shadow hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
+    >
+      Nova parcela
+    </button>
+  );
+
   return (
     <div className="relative h-full w-full bg-blue-100">
       {!isReady && (
@@ -447,23 +349,7 @@ export function MapView({
       />
 
       <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 items-start">
-        {isCreatingNew ? (
-          <button
-            onClick={handleCancelDraw}
-            disabled={!isReady}
-            className="px-3 py-2 bg-background text-foreground border border-border rounded-md shadow hover:bg-muted disabled:opacity-50 text-sm font-medium"
-          >
-            Cancelar debuxo
-          </button>
-        ) : (
-          <button
-            onClick={handleStartDraw}
-            disabled={!isReady || createPlot.isPending || !!editingPlotId}
-            className="px-3 py-2 bg-primary text-primary-foreground rounded-md shadow hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
-          >
-            Nova parcela
-          </button>
-        )}
+        {drawButton}
         {isCreatingNew && (
           <div className="bg-background/95 border border-primary/30 rounded-md shadow px-3 py-2 text-xs max-w-xs">
             <p className="font-medium text-foreground mb-0.5">
@@ -494,4 +380,72 @@ export function MapView({
       )}
     </div>
   );
+}
+
+function findLayerByPlotId(
+  group: L.LayerGroup | null,
+  plotId: number
+): EditableLayer | undefined {
+  return group
+    ?.getLayers()
+    .find((l) => (l as EditableLayer)._plotId === plotId) as
+    | EditableLayer
+    | undefined;
+}
+
+function syncLayers(
+  L: LeafletNS,
+  group: L.LayerGroup,
+  plots: Plot[],
+  callbacksRef: React.RefObject<MapCallbacks>
+) {
+  const existing = new Map<number, EditableLayer>();
+  group.eachLayer((layer) => {
+    const editable = layer as EditableLayer;
+    if (editable._plotId != null) existing.set(editable._plotId, editable);
+  });
+
+  const newIds = new Set(plots.map((p) => p.id));
+  existing.forEach((layer, id) => {
+    if (!newIds.has(id)) group.removeLayer(layer);
+  });
+
+  plots.forEach((plot) => {
+    const prev = existing.get(plot.id);
+    if (prev?.setStyle) {
+      prev.setStyle({ color: plot.color, fillColor: plot.color });
+      return;
+    }
+    const geoJsonLayer = L.geoJSON(plot.geometry, {
+      style: {
+        color: plot.color,
+        fillColor: plot.color,
+        fillOpacity: 0.25,
+        weight: 3,
+      },
+      pmIgnore: false,
+    });
+    const layer = geoJsonLayer.getLayers()[0] as EditableLayer | undefined;
+    if (!layer) return;
+    layer._plotId = plot.id;
+    layer.on("click", (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e);
+      callbacksRef.current?.onSelectPlot(plot.id);
+    });
+    layer.on("pm:edit", () => {
+      const geojson = layer.toGeoJSON();
+      callbacksRef.current?.updatePlot.mutate({
+        id: plot.id,
+        plot: { geometry: geojson.geometry },
+      });
+    });
+    layer.on("pm:dragend", () => {
+      const geojson = layer.toGeoJSON();
+      callbacksRef.current?.updatePlot.mutate({
+        id: plot.id,
+        plot: { geometry: geojson.geometry },
+      });
+    });
+    group.addLayer(layer);
+  });
 }

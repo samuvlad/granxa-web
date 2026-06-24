@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import type { Lote, Plot, Rotation } from "@/types";
+import { indexBy } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,16 @@ interface RotationListProps {
   onFinish: (rotation: Rotation) => void;
 }
 
+function partitionByActive(rotations: Rotation[]) {
+  const active: Rotation[] = [];
+  const past: Rotation[] = [];
+  for (const r of rotations) {
+    if (!r.data_fim) active.push(r);
+    else past.push(r);
+  }
+  return { active, past };
+}
+
 export function RotationList({
   rotations,
   plots,
@@ -42,27 +53,9 @@ export function RotationList({
   onDelete,
   onFinish,
 }: RotationListProps) {
-  const { active, past } = useMemo(() => {
-    const a: Rotation[] = [];
-    const p: Rotation[] = [];
-    for (const r of rotations) {
-      if (!r.data_fim) a.push(r);
-      else p.push(r);
-    }
-    return { active: a, past: p };
-  }, [rotations]);
-
-  const plotById = useMemo(() => {
-    const map = new Map<number, Plot>();
-    plots.forEach((p) => map.set(p.id, p));
-    return map;
-  }, [plots]);
-
-  const loteById = useMemo(() => {
-    const map = new Map<number, Lote>();
-    lotes.forEach((l) => map.set(l.id, l));
-    return map;
-  }, [lotes]);
+  const { active, past } = useMemo(() => partitionByActive(rotations), [rotations]);
+  const plotById = useMemo(() => indexBy(plots, "id"), [plots]);
+  const loteById = useMemo(() => indexBy(lotes, "id"), [lotes]);
 
   return (
     <div className="space-y-8">
@@ -186,31 +179,23 @@ function RotationCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Parcela
-          </p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Parcela</p>
           <p className="text-sm font-medium">
             {plot ? plot.name : `ID ${rotation.parcela_id}`}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Inicio
-            </p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Inicio</p>
             <p>{formatDate(rotation.data_inicio)}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Fin
-            </p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Fin</p>
             <p>{rotation.data_fim ? formatDate(rotation.data_fim) : "En curso"}</p>
           </div>
         </div>
         {rotation.notas ? (
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {rotation.notas}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-3">{rotation.notas}</p>
         ) : null}
       </CardContent>
     </Card>

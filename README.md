@@ -35,16 +35,17 @@ docker compose exec app sh        # abrir unha shell no contedor
 
 ```bash
 npm install
-npm run dev
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
-A aplicación estará dispoñible en `http://localhost:3000`. Os mocks
-actívanse por defecto; non necesitas backend.
+A aplicación estará dispoñible en `http://localhost:3000`. **Require un
+backend FastAPI accesible** en `NEXT_PUBLIC_API_URL`; sen el, as peticións
+fallarán.
 
 ## Build de produción (sen Docker)
 
 ```bash
-npm run build
+NEXT_PUBLIC_API_URL=https://api.example.com npm run build
 npm start
 ```
 
@@ -52,42 +53,93 @@ npm start
 
 | Variable                | Descrición                                                                              | Por defecto              |
 | ----------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| `NEXT_PUBLIC_API_URL`   | URL base do backend FastAPI (só se usa cando os mocks están desactivados).              | `http://localhost:8000`  |
-| `NEXT_PUBLIC_USE_MOCKS` | `false` ou `0` desactiva os mocks e conecta ao backend real. Calquera outro valor (ou non definida) deixa os mocks activos. | _(activado)_             |
+| `NEXT_PUBLIC_API_URL`   | URL base do backend FastAPI empregada polo **navegador**. Debe ser alcanzable dende o PC do usuario. | _(baleira)_              |
+| `API_URL`               | URL base do backend FastAPI empregada polo **servidor** (Server Components). Útil en Docker para apuntar ao contedor da API pola rede interna. | _(baleira)_              |
+
+Se só se define `NEXT_PUBLIC_API_URL`, o servidor e o cliente empregan a
+mesma URL. O `lib/api.ts` escolle automaticamente:
+
+- No servidor (`window` indefinido) → `API_URL` se existe, senón `NEXT_PUBLIC_API_URL`
+- No cliente (`window` definido) → `NEXT_PUBLIC_API_URL`
+
+### Con Docker (recomendado)
+
+`docker-compose.yml` define ambas:
+
+- `NEXT_PUBLIC_API_URL=http://localhost:8000` → o navegador do host
+  golpea a API directamente en `localhost:8000`
+- `API_URL=http://<nome-do-contedor-api>:8000` → o servidor dentro do
+  contedor da web fala co contedor da API pola rede Docker
+
+A rede externa `granxa-net` debe existir e o servizo da API debe estar
+unido a ela:
+
+```bash
+docker network create granxa-net
+```
 
 ### Conectar a un backend real
 
 ```bash
-# Local
-NEXT_PUBLIC_USE_MOCKS=false NEXT_PUBLIC_API_URL=https://api.example.com npm run dev
-
-# Docker (editar docker-compose.yml)
-#   args:
-#     NEXT_PUBLIC_USE_MOCKS: "false"
-#   environment:
-#     NEXT_PUBLIC_USE_MOCKS: "false"
-#     NEXT_PUBLIC_API_URL: https://api.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com npm run dev
 ```
 
-⚠️ `NEXT_PUBLIC_*` inlínase no bundle no build. Para cambiar o seu valor
-en Docker hai que facer rebuild (`docker compose up --build`).
+O cliente HTTP apunta a `${NEXT_PUBLIC_API_URL}/api/...` por defecto, así
+que a URL debe incluír o prefixo se o backend o require.
 
-## Estrutura
-
-- `app/` — páxinas e layout de Next.js (App Router)
-- `components/map/` — compoñentes do mapa (Leaflet + Geoman)
-- `components/lotes|sheep|grazing|...` — CRUD por dominio
-- `components/ui/` — wrappers sobre `@base-ui/react` (Button, Dialog, etc.)
-- `lib/api.ts` — cliente HTTP (axios) para o backend
-- `lib/api-mock.ts` — mocks en memoria con seed data (lotes, ovellas, parcelas, rotacións)
-- `lib/queries.ts` — hooks de TanStack Query
-- `types/` — tipos compartidos
-
-## Detalles técnicos
+## Arquitectura
 
 - **Next.js 16** con App Router e `output: "standalone"` (build optimizado para Docker)
 - **React 19**
-- **Mapa**: Leaflet + Geoman para debuxar/editar polígonos de parcelas
-- **Mocks**: intercéptanse as chamadas de axios no cliente (`installApiMocks`).
-  Os datos viven en memoria e persisten mentres a sesión estea aberta
-  (lotes, ovellas, parcelas, rotacións).
+- **Server Components** por defecto: cada páxina chama directamente ao
+  backend FastAPI no servidor mediante `lib/api.ts` e pasa o resultado
+  como `initialData` a unha *client island* con TanStack Query
+- **Mapa**: Leaflet + Geoman cargados en client side mediante
+  `import()` dinámico
+- **Confirmacións**: substituíuse `window.confirm()` por un `ConfirmDialog`
+  accesible (`components/ui/confirm-dialog.tsx`)
+
+## Estrutura
+
+```
+app/
+  (app)/
+    page.tsx                   ← Server Component (Dashboard)
+    layout.tsx                 ← Layout con sidebar
+    loading.tsx                ← Spinner para o segmento
+    error.tsx                  ← Boundary de erro
+    not-found.tsx              ← 404
+    parcelas/
+      page.tsx                 ← Server Component
+      _components/             ← Client islands
+      _hooks/                  ← Custom hooks específicos
+    rebanho/
+      [id]/page.tsx            ← generateMetadata dinámico
+components/
+  map/        ← MapView, PlotSidebar
+  lotes/      ← LoteList, LoteFormDialog
+  sheep/      ← SheepTable, SheepFormDialog, SheepStatusBadge
+  grazing/    ← RotationList, RotationFormDialog
+  dashboard/  ← KPICard, ActivityFeed, QuickActions, RotationsSummary
+  layout/     ← AppSidebar, PageHeader, SectionPlaceholder
+  ui/         ← Button, Dialog, Select, ConfirmDialog, Textarea, …
+lib/
+  api.ts                      ← Cliente fetch con API agrupada
+  queries.ts                  ← Hooks de TanStack Query
+  utils.ts                    ← cn, indexBy, uniqueBy
+types/
+  index.ts                    ← Tipos do dominio
+```
+
+## Detalles técnicos
+
+- `useConfirm` (`components/ui/confirm-dialog.tsx`): hook que devolve unha
+  promesa ao estilo de `window.confirm()` pero renderizando un Dialog
+  accesible. Non usa estado global; cada quenda monta o seu propio Dialog
+  dentro do compoñente que o chama
+- O **cliente HTTP** (`lib/api.ts`) lanza `ApiError` con `status` e
+  `detail` cando o backend devolve unha resposta non-OK; o frontend
+  traduce estes erros a mensaxes mediante `getApiErrorMessage`
+- As páxinas con `[id]` usan `generateMetadata` para que o título da
+  pestaña reflicta a entidade (p.ex. "Margarita · Granxa Maps"). Se o
+  backend devolve 404, a páxina chama a `notFound()`

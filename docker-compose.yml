@@ -2,19 +2,24 @@ services:
   app:
     build:
       context: .
-      args:
-        NEXT_PUBLIC_USE_MOCKS: "false"
     image: granxa-web:dev
     container_name: granxa-web
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_USE_MOCKS: "false"
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      API_URL: http://granxa-maps-api:8000
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     volumes:
       - .:/app
       - /app/node_modules
       - /app/.next
+    networks:
+      - granxa-net
     restart: unless-stopped
+
+networks:
+  granxa-net:
+    external: true

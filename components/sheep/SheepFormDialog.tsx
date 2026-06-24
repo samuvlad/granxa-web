@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert } from "@/components/ui/alert";
 
 interface SheepFormDialogProps {
@@ -41,20 +42,14 @@ const ESTADO_VALUES: EstadoAnimal[] = ["activo", "vendido", "morto"];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function defaultsFromSheep(
-  sheep?: Sheep | null
-): {
-  crotal: string;
-  nome: string;
-  sexo: Sexo;
-  dataNacemento: string;
-  raca: string;
-  estado: EstadoAnimal;
-  naiId: string;
-  paiId: string;
-  loteId: string;
-  notas: string;
-} {
+const SEXO_LABEL: Record<Sexo, string> = { femia: "Femia", macho: "Macho" };
+const ESTADO_LABEL: Record<EstadoAnimal, string> = {
+  activo: "Activo",
+  vendido: "Vendido",
+  morto: "Morto",
+};
+
+function defaultsFromSheep(sheep?: Sheep | null) {
   if (sheep) {
     return {
       crotal: sheep.crotal,
@@ -72,10 +67,10 @@ function defaultsFromSheep(
   return {
     crotal: "",
     nome: "",
-    sexo: "femia",
+    sexo: "femia" as Sexo,
     dataNacemento: today(),
     raca: "Gallega",
-    estado: "activo",
+    estado: "activo" as EstadoAnimal,
     naiId: "",
     paiId: "",
     loteId: "",
@@ -96,8 +91,6 @@ export function SheepFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        {/* The `key` ensures a fresh form state every time we open the dialog
-            or switch between editing a different sheep. */}
         <SheepFormBody
           key={sheep?.id ?? "new"}
           sheep={sheep}
@@ -159,6 +152,8 @@ function SheepFormBody({
   };
 
   const possibleParents = sheepOptions.filter((s) => s.id !== sheep?.id);
+  const mothers = possibleParents.filter((s) => s.sexo === "femia");
+  const fathers = possibleParents.filter((s) => s.sexo === "macho");
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -201,23 +196,19 @@ function SheepFormBody({
 
         <div className="space-y-1.5">
           <Label htmlFor="raca">Raza</Label>
-          <Input
-            id="raca"
-            value={raca}
-            onChange={(e) => setRaca(e.target.value)}
-          />
+          <Input id="raca" value={raca} onChange={(e) => setRaca(e.target.value)} />
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="sexo">Sexo</Label>
           <Select value={sexo} onValueChange={(v) => setSexo(v as Sexo)}>
             <SelectTrigger id="sexo" className="w-full">
-              <SelectValue>{sexo === "femia" ? "Femia" : "Macho"}</SelectValue>
+              <SelectValue>{SEXO_LABEL[sexo]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {SEXO_VALUES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {s === "femia" ? "Femia" : "Macho"}
+                  {SEXO_LABEL[s]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -237,15 +228,10 @@ function SheepFormBody({
 
         <div className="space-y-1.5 col-span-2">
           <Label htmlFor="lote">Lote</Label>
-          <Select
-            value={loteId}
-            onValueChange={(v) => setLoteId(v ?? "")}
-          >
+          <Select value={loteId} onValueChange={(v) => setLoteId(v ?? "")}>
             <SelectTrigger id="lote" className="w-full">
               <SelectValue placeholder="Sen asignar">
-                {loteId
-                  ? lotes.find((l) => String(l.id) === loteId)?.name ?? "Sen asignar"
-                  : null}
+                {loteId ? (lotes.find((l) => String(l.id) === loteId)?.name ?? null) : null}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -269,101 +255,42 @@ function SheepFormBody({
             onValueChange={(v) => setEstado(v as EstadoAnimal)}
           >
             <SelectTrigger id="estado" className="w-full">
-              <SelectValue>
-                {estado === "activo"
-                  ? "Activo"
-                  : estado === "vendido"
-                    ? "Vendido"
-                    : "Morto"}
-              </SelectValue>
+              <SelectValue>{ESTADO_LABEL[estado]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {ESTADO_VALUES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {s === "activo"
-                    ? "Activo"
-                    : s === "vendido"
-                      ? "Vendido"
-                      : "Morto"}
+                  {ESTADO_LABEL[s]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="nai">Nai</Label>
-          <Select
-            value={naiId}
-            onValueChange={(v) => setNaiId(v ?? "")}
-          >
-            <SelectTrigger id="nai" className="w-full">
-              <SelectValue placeholder="Sen asignar">
-                {naiId
-                  ? possibleParents
-                      .filter((s) => s.sexo === "femia")
-                      .find((s) => String(s.id) === naiId)?.nome ??
-                    possibleParents
-                      .filter((s) => s.sexo === "femia")
-                      .find((s) => String(s.id) === naiId)?.crotal ??
-                    "Sen asignar"
-                  : null}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Sen asignar</SelectItem>
-              {possibleParents
-                .filter((s) => s.sexo === "femia")
-                .map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.nome ?? s.crotal}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ParentSelect
+          id="nai"
+          label="Nai"
+          value={naiId}
+          onChange={setNaiId}
+          options={mothers}
+        />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="pai">Pai</Label>
-          <Select
-            value={paiId}
-            onValueChange={(v) => setPaiId(v ?? "")}
-          >
-            <SelectTrigger id="pai" className="w-full">
-              <SelectValue placeholder="Sen asignar">
-                {paiId
-                  ? possibleParents
-                      .filter((s) => s.sexo === "macho")
-                      .find((s) => String(s.id) === paiId)?.nome ??
-                    possibleParents
-                      .filter((s) => s.sexo === "macho")
-                      .find((s) => String(s.id) === paiId)?.crotal ??
-                    "Sen asignar"
-                  : null}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Sen asignar</SelectItem>
-              {possibleParents
-                .filter((s) => s.sexo === "macho")
-                .map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.nome ?? s.crotal}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ParentSelect
+          id="pai"
+          label="Pai"
+          value={paiId}
+          onChange={setPaiId}
+          options={fathers}
+        />
 
         <div className="space-y-1.5 col-span-2">
           <Label htmlFor="notas">Notas</Label>
-          <textarea
+          <Textarea
             id="notas"
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             rows={3}
             placeholder="Observacións, tratamentos, particularidades…"
-            className="flex w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
           />
         </div>
       </div>
@@ -383,5 +310,41 @@ function SheepFormBody({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+function ParentSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Sheep[];
+}) {
+  const selected = options.find((s) => String(s.id) === value);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Sen asignar">
+            {selected ? (selected.nome ?? selected.crotal) : null}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="">Sen asignar</SelectItem>
+          {options.map((s) => (
+            <SelectItem key={s.id} value={String(s.id)}>
+              {s.nome ?? s.crotal}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

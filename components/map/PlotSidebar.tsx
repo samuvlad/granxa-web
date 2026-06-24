@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { usePlots, useUpdatePlot, useDeletePlot } from "@/lib/queries";
+import { useDeletePlot, usePlots, useUpdatePlot } from "@/lib/queries";
+import { getApiErrorMessage } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Plot } from "@/types";
+import type { useMapDraft } from "@/app/(app)/parcelas/_hooks/use-map-draft";
 
 interface PlotSidebarProps {
   selectedPlotId: number | null;
@@ -10,14 +13,7 @@ interface PlotSidebarProps {
   editingPlotId: number | null;
   onEditingChange: (id: number | null) => void;
   isCreatingNew: boolean;
-  draftName: string;
-  draftColor: string;
-  draftNotes: string;
-  onDraftChange: (updates: {
-    name?: string;
-    color?: string;
-    notes?: string;
-  }) => void;
+  draft: ReturnType<typeof useMapDraft>;
   onCancelCreate: () => void;
 }
 
@@ -37,31 +33,32 @@ export function PlotSidebar({
   editingPlotId,
   onEditingChange,
   isCreatingNew,
-  draftName,
-  draftColor,
-  draftNotes,
-  onDraftChange,
+  draft,
   onCancelCreate,
 }: PlotSidebarProps) {
   const { data: plots = [], isLoading } = usePlots();
   const updatePlot = useUpdatePlot();
   const deletePlot = useDeletePlot();
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
   const sortedPlots = [...plots].sort((a, b) => a.id - b.id);
 
-  const handleSelect = (id: number) => {
-    onSelectPlot(id);
-  };
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const handleClear = () => {
-    onSelectPlot(null);
-  };
-
-  const handleDelete = (id: number) => {
-    if (!confirm("Eliminar a parcela seleccionada?")) return;
-    deletePlot.mutate(id);
-    handleClear();
+  const handleDelete = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: "Eliminar parcela",
+      description: `Vas eliminar a parcela "${name}". Esta acción non se pode desfacer.`,
+      confirmLabel: "Eliminar",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    deletePlot.mutate(id, {
+      onSuccess: () => onSelectPlot(null),
+      onError: (err) => setErrorMessage(getApiErrorMessage(err)),
+    });
   };
 
   return (
@@ -82,10 +79,7 @@ export function PlotSidebar({
         </h3>
         {isCreatingNew ? (
           <NewPlotForm
-            draftName={draftName}
-            draftColor={draftColor}
-            draftNotes={draftNotes}
-            onDraftChange={onDraftChange}
+            draft={draft}
             onCancel={onCancelCreate}
           />
         ) : selectedPlot ? (
@@ -93,7 +87,9 @@ export function PlotSidebar({
             key={selectedPlot.id}
             plot={selectedPlot}
             editing={editingPlotId === selectedPlot.id}
+            errorMessage={errorMessage}
             onSave={(data) => {
+              setErrorMessage(null);
               updatePlot.mutate(
                 { id: selectedPlot.id, plot: data },
                 {
@@ -102,10 +98,11 @@ export function PlotSidebar({
                       onEditingChange(null);
                     }
                   },
+                  onError: (err) => setErrorMessage(getApiErrorMessage(err)),
                 }
               );
             }}
-            onDelete={() => handleDelete(selectedPlot.id)}
+            onDelete={() => handleDelete(selectedPlot.id, selectedPlot.name)}
             onToggleEdit={() =>
               onEditingChange(
                 editingPlotId === selectedPlot.id ? null : selectedPlot.id
@@ -134,7 +131,7 @@ export function PlotSidebar({
             {sortedPlots.map((plot) => (
               <div
                 key={plot.id}
-                onClick={() => handleSelect(plot.id)}
+                onClick={() => onSelectPlot(plot.id)}
                 className={`w-full text-left p-3 rounded-md border cursor-pointer transition-colors ${
                   selectedPlotId === plot.id
                     ? "bg-primary/10 border-primary"
@@ -159,6 +156,7 @@ export function PlotSidebar({
           </div>
         )}
       </section>
+      {confirmDialog}
     </aside>
   );
 }
@@ -166,6 +164,7 @@ export function PlotSidebar({
 function PlotEditForm({
   plot,
   editing,
+  errorMessage,
   onSave,
   onDelete,
   onToggleEdit,
@@ -174,6 +173,7 @@ function PlotEditForm({
 }: {
   plot: Plot;
   editing: boolean;
+  errorMessage: string | null;
   onSave: (data: { name: string; color: string; notes: string | null }) => void;
   onDelete: () => void;
   onToggleEdit: () => void;
@@ -187,9 +187,7 @@ function PlotEditForm({
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-xs text-muted-foreground mb-1">
-          Nome
-        </label>
+        <label className="block text-xs text-muted-foreground mb-1">Nome</label>
         <input
           type="text"
           value={name}
@@ -231,6 +229,11 @@ function PlotEditForm({
           </p>
         </div>
       </div>
+      {errorMessage ? (
+        <p className="text-xs text-destructive" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
       <div className="flex gap-2">
         <button
           onClick={() => onSave({ name, color, notes: notes || null })}
@@ -262,20 +265,10 @@ function PlotEditForm({
 }
 
 function NewPlotForm({
-  draftName,
-  draftColor,
-  draftNotes,
-  onDraftChange,
+  draft,
   onCancel,
 }: {
-  draftName: string;
-  draftColor: string;
-  draftNotes: string;
-  onDraftChange: (updates: {
-    name?: string;
-    color?: string;
-    notes?: string;
-  }) => void;
+  draft: ReturnType<typeof useMapDraft>;
   onCancel: () => void;
 }) {
   return (
@@ -295,8 +288,8 @@ function NewPlotForm({
         </label>
         <input
           type="text"
-          value={draftName}
-          onChange={(e) => onDraftChange({ name: e.target.value })}
+          value={draft.name}
+          onChange={(e) => draft.update({ name: e.target.value })}
           placeholder="Ex.: Pasto do río"
           className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background"
           autoFocus
@@ -308,12 +301,12 @@ function NewPlotForm({
         <div className="flex flex-wrap gap-1.5 items-center">
           {PARCEL_COLORS.map((c) => {
             const active =
-              c.value.toLowerCase() === (draftColor || "").toLowerCase();
+              c.value.toLowerCase() === (draft.color || "").toLowerCase();
             return (
               <button
                 key={c.value}
                 type="button"
-                onClick={() => onDraftChange({ color: c.value })}
+                onClick={() => draft.update({ color: c.value })}
                 className={`w-7 h-7 rounded-md border-2 transition-all ${
                   active
                     ? "border-foreground scale-110"
@@ -331,12 +324,12 @@ function NewPlotForm({
           >
             <span
               className="absolute inset-0.5 rounded-sm"
-              style={{ backgroundColor: draftColor }}
+              style={{ backgroundColor: draft.color }}
             />
             <input
               type="color"
-              value={draftColor}
-              onChange={(e) => onDraftChange({ color: e.target.value })}
+              value={draft.color}
+              onChange={(e) => draft.update({ color: e.target.value })}
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
           </label>
@@ -348,8 +341,8 @@ function NewPlotForm({
           Observacións
         </label>
         <textarea
-          value={draftNotes}
-          onChange={(e) => onDraftChange({ notes: e.target.value })}
+          value={draft.notes}
+          onChange={(e) => draft.update({ notes: e.target.value })}
           rows={3}
           placeholder="Notas, manexo, accesos…"
           className="w-full px-2 py-1.5 text-sm border border-input rounded-md bg-background resize-none"

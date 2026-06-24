@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useCreateLote } from "@/lib/queries";
 
 interface RotationFormDialogProps {
@@ -39,18 +40,13 @@ interface RotationFormDialogProps {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const EMPTY_VALUE = "__none__";
+
 function defaults(
   rotation: Rotation | null | undefined,
   plots: Plot[],
   lotes: Lote[]
-): {
-  parcelaId: string;
-  loteId: string;
-  dataInicio: string;
-  dataFin: string;
-  senDataFin: boolean;
-  notas: string;
-} {
+) {
   if (rotation) {
     const hasFin = !!rotation.data_fim;
     return {
@@ -170,21 +166,17 @@ function RotationFormBody({
           <div className="space-y-1.5 col-span-2">
             <Label htmlFor="lote">Lote</Label>
             <div className="flex gap-2">
-              <Select
-                value={loteId}
-                onValueChange={(v) => setLoteId(v ?? "")}
-              >
+              <Select value={loteId} onValueChange={(v) => setLoteId(v ?? "")}>
                 <SelectTrigger id="lote" className="w-full">
                   <SelectValue placeholder="Selecciona lote">
                     {loteId
-                      ? lotes.find((l) => String(l.id) === loteId)?.name ??
-                        "Selecciona lote"
+                      ? (lotes.find((l) => String(l.id) === loteId)?.name ?? null)
                       : null}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {lotes.length === 0 ? (
-                    <SelectItem value="__none__" disabled>
+                    <SelectItem value={EMPTY_VALUE} disabled>
                       Non hai lotes rexistrados
                     </SelectItem>
                   ) : (
@@ -218,14 +210,13 @@ function RotationFormBody({
               <SelectTrigger id="parcela" className="w-full">
                 <SelectValue placeholder="Selecciona parcela">
                   {parcelaId
-                    ? plots.find((p) => String(p.id) === parcelaId)?.name ??
-                      "Selecciona parcela"
+                    ? (plots.find((p) => String(p.id) === parcelaId)?.name ?? null)
                     : null}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {plots.length === 0 ? (
-                  <SelectItem value="__none__" disabled>
+                  <SelectItem value={EMPTY_VALUE} disabled>
                     Non hai parcelas rexistradas
                   </SelectItem>
                 ) : (
@@ -279,13 +270,12 @@ function RotationFormBody({
 
           <div className="space-y-1.5 col-span-2">
             <Label htmlFor="notas">Notas</Label>
-            <textarea
+            <Textarea
               id="notas"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows={3}
               placeholder="Observacións sobre a rotación, motivo, densidade…"
-              className="flex w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
             />
           </div>
         </div>
@@ -301,12 +291,7 @@ function RotationFormBody({
           </Button>
           <Button
             type="submit"
-            disabled={
-              isPending ||
-              !parcelaId ||
-              !loteId ||
-              dataFinInvalida
-            }
+            disabled={isPending || !parcelaId || !loteId || dataFinInvalida}
           >
             <SaveIcon className="size-4" />
             {rotation ? "Gardar cambios" : "Crear rotación"}
@@ -317,9 +302,8 @@ function RotationFormBody({
       <CreateLoteDialog
         open={createLoteOpen}
         onOpenChange={setCreateLoteOpen}
-        onCreated={(lote) => setLoteId(String(lote.id))}
         isPending={createLote.isPending}
-        onSubmit={(data: LoteCreate) =>
+        onSubmit={(data) =>
           createLote.mutate(data, {
             onSuccess: (created) => {
               setCreateLoteOpen(false);
@@ -340,7 +324,6 @@ function CreateLoteDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (lote: Lote) => void;
   isPending: boolean;
   onSubmit: (data: LoteCreate) => void;
 }) {
@@ -385,12 +368,11 @@ function CreateLoteDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="lote-notas">Notas</Label>
-            <textarea
+            <Textarea
               id="lote-notas"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows={2}
-              className="flex w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
             />
           </div>
           <DialogFooter>

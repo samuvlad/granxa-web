@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { WalletIcon } from "lucide-react";
 
 import { SectionPlaceholder } from "@/components/layout/SectionPlaceholder";
+
+export const metadata: Metadata = {
+  title: "Finanzas",
+  description: "Gastos, ingresos, balance e subvencións",
+};
 
 export default function FinanzasPage() {
   return (

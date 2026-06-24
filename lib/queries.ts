@@ -4,221 +4,191 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import {
-  createLote,
-  createPlot,
-  createRotation,
-  createSheep,
-  deleteLote,
-  deletePlot,
-  deleteRotation,
-  deleteSheep,
-  getLote,
-  getRotation,
-  getSheep,
-  listLotes,
-  listPlots,
-  listRotations,
-  listSheep,
-  updateLote,
-  updatePlot,
-  updateRotation,
-  updateSheep,
-} from "@/lib/api";
+import { lotes, plots, rotations, sheep } from "@/lib/api";
 import type {
+  Lote,
   LoteUpdate,
+  Plot,
   PlotUpdate,
+  Rotation,
   RotationUpdate,
+  Sheep,
   SheepUpdate,
 } from "@/types";
 
-export const PLOTS_KEY = "plots";
-export const SHEEP_KEY = "sheep";
-export const LOTES_KEY = "lotes";
-export const ROTATIONS_KEY = "rotations";
+export const QUERY_KEYS = {
+  plots: ["plots"] as const,
+  sheep: ["sheep"] as const,
+  lotes: ["lotes"] as const,
+  rotations: ["rotations"] as const,
+};
 
-export function usePlots() {
+export function usePlots(initialData?: Plot[]) {
   return useQuery({
-    queryKey: [PLOTS_KEY],
-    queryFn: listPlots,
+    queryKey: QUERY_KEYS.plots,
+    queryFn: plots.list,
+    initialData,
   });
 }
 
 export function useCreatePlot() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: createPlot,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PLOTS_KEY] });
-    },
+    mutationFn: plots.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.plots }),
   });
 }
 
 export function useUpdatePlot() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, plot }: { id: number; plot: PlotUpdate }) =>
-      updatePlot(id, plot),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PLOTS_KEY] });
-    },
+      plots.update(id, plot),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.plots }),
   });
 }
 
 export function useDeletePlot() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: deletePlot,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PLOTS_KEY] });
-    },
+    mutationFn: plots.remove,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.plots }),
   });
 }
 
-export function useSheep() {
+export function useSheep(initialData?: Sheep[]) {
   return useQuery({
-    queryKey: [SHEEP_KEY],
-    queryFn: listSheep,
+    queryKey: QUERY_KEYS.sheep,
+    queryFn: sheep.list,
+    initialData,
   });
 }
 
-export function useSheepDetail(id: number) {
+export function useSheepDetail(id: number, initialData?: Sheep) {
   return useQuery({
-    queryKey: [SHEEP_KEY, id],
-    queryFn: () => getSheep(id),
+    queryKey: [...QUERY_KEYS.sheep, id] as const,
+    queryFn: () => sheep.get(id),
     enabled: Number.isFinite(id) && id > 0,
+    initialData,
   });
 }
 
 export function useCreateSheep() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: createSheep,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
-    },
+    mutationFn: sheep.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.sheep }),
   });
 }
 
 export function useUpdateSheep() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, sheep }: { id: number; sheep: SheepUpdate }) =>
-      updateSheep(id, sheep),
+    mutationFn: ({ id, sheep: data }: { id: number; sheep: SheepUpdate }) =>
+      sheep.update(id, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.sheep });
       if (data) {
-        queryClient.invalidateQueries({ queryKey: [SHEEP_KEY, data.id] });
+        qc.invalidateQueries({ queryKey: [...QUERY_KEYS.sheep, data.id] });
       }
     },
   });
 }
 
 export function useDeleteSheep() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteSheep,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
-    },
+    mutationFn: sheep.remove,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.sheep }),
   });
 }
 
-export function useLotes() {
+export function useLotes(initialData?: Lote[]) {
   return useQuery({
-    queryKey: [LOTES_KEY],
-    queryFn: listLotes,
+    queryKey: QUERY_KEYS.lotes,
+    queryFn: lotes.list,
+    initialData,
   });
 }
 
-export function useLoteDetail(id: number) {
+export function useLoteDetail(id: number, initialData?: Lote) {
   return useQuery({
-    queryKey: [LOTES_KEY, id],
-    queryFn: () => getLote(id),
+    queryKey: [...QUERY_KEYS.lotes, id] as const,
+    queryFn: () => lotes.get(id),
     enabled: Number.isFinite(id) && id > 0,
+    initialData,
   });
 }
 
 export function useCreateLote() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: createLote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
-    },
+    mutationFn: lotes.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.lotes }),
   });
 }
 
 export function useUpdateLote() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, lote }: { id: number; lote: LoteUpdate }) =>
-      updateLote(id, lote),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
-    },
+      lotes.update(id, lote),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.lotes }),
   });
 }
 
 export function useDeleteLote() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteLote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [LOTES_KEY] });
-    },
+    mutationFn: lotes.remove,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.lotes }),
   });
 }
 
-export function useRotations() {
+export function useRotations(initialData?: Rotation[]) {
   return useQuery({
-    queryKey: [ROTATIONS_KEY],
-    queryFn: listRotations,
+    queryKey: QUERY_KEYS.rotations,
+    queryFn: rotations.list,
+    initialData,
   });
 }
 
-export function useRotationDetail(id: number) {
+export function useRotationDetail(id: number, initialData?: Rotation) {
   return useQuery({
-    queryKey: [ROTATIONS_KEY, id],
-    queryFn: () => getRotation(id),
+    queryKey: [...QUERY_KEYS.rotations, id] as const,
+    queryFn: () => rotations.get(id),
     enabled: Number.isFinite(id) && id > 0,
+    initialData,
   });
 }
 
 export function useCreateRotation() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: createRotation,
+    mutationFn: rotations.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ROTATIONS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.rotations });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.sheep });
     },
   });
 }
 
 export function useUpdateRotation() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      rotation,
-    }: {
-      id: number;
-      rotation: RotationUpdate;
-    }) => updateRotation(id, rotation),
+    mutationFn: ({ id, rotation }: { id: number; rotation: RotationUpdate }) =>
+      rotations.update(id, rotation),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ROTATIONS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [SHEEP_KEY] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.rotations });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.sheep });
     },
   });
 }
 
 export function useDeleteRotation() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteRotation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ROTATIONS_KEY] });
-    },
+    mutationFn: rotations.remove,
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.rotations }),
   });
 }

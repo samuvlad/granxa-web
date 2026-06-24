@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface LoteFormDialogProps {
   open: boolean;
@@ -27,14 +28,9 @@ interface LoteFormDialogProps {
   errorMessage?: string | null;
 }
 
-function defaultsFromLote(
-  lote?: Lote | null
-): { name: string; notas: string } {
+function defaultsFromLote(lote?: Lote | null) {
   if (lote) {
-    return {
-      name: lote.name,
-      notas: lote.notas ?? "",
-    };
+    return { name: lote.name, notas: lote.notas ?? "" };
   }
   return { name: "", notas: "" };
 }
@@ -120,13 +116,12 @@ function LoteFormBody({
 
         <div className="space-y-1.5">
           <Label htmlFor="lote-notas">Notas</Label>
-          <textarea
+          <Textarea
             id="lote-notas"
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             rows={3}
             placeholder="Observacións sobre o lote, composición, manexo…"
-            className="flex w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
           />
         </div>
       </div>
