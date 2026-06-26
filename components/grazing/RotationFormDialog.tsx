@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PlusIcon, SaveIcon } from "lucide-react";
 
-import type { Lote, LoteCreate, Plot, Rotation, RotationCreate } from "@/types";
+import type { Lote, LoteCreate, Plot, Rotation, RotationCreate, RotationUpdate } from "@/types";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,12 @@ interface RotationFormDialogProps {
   rotation?: Rotation | null;
   plots: Plot[];
   lotes: Lote[];
-  onSubmit: (data: RotationCreate) => void;
+  activeRotationByLote?: Map<number, Rotation>;
+  onCloseActiveAndCreate?: (
+    data: RotationCreate,
+    activeId: number
+  ) => void;
+  onSubmit: (data: RotationCreate | RotationUpdate) => void;
   isPending?: boolean;
   errorMessage?: string | null;
 }
@@ -74,6 +79,8 @@ export function RotationFormDialog({
   rotation,
   plots,
   lotes,
+  activeRotationByLote,
+  onCloseActiveAndCreate,
   onSubmit,
   isPending,
   errorMessage,
@@ -86,6 +93,8 @@ export function RotationFormDialog({
           rotation={rotation}
           plots={plots}
           lotes={lotes}
+          activeRotationByLote={activeRotationByLote ?? new Map()}
+          onCloseActiveAndCreate={onCloseActiveAndCreate}
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}
           isPending={!!isPending}
@@ -100,6 +109,8 @@ function RotationFormBody({
   rotation,
   plots,
   lotes,
+  activeRotationByLote,
+  onCloseActiveAndCreate,
   onSubmit,
   onCancel,
   isPending,
@@ -108,7 +119,11 @@ function RotationFormBody({
   rotation?: Rotation | null;
   plots: Plot[];
   lotes: Lote[];
-  onSubmit: (data: RotationCreate) => void;
+  activeRotationByLote: Map<number, Rotation>;
+  onCloseActiveAndCreate?:
+    | ((data: RotationCreate, activeId: number) => void)
+    | undefined;
+  onSubmit: (data: RotationCreate | RotationUpdate) => void;
   onCancel: () => void;
   isPending: boolean;
   errorMessage: string | null;
@@ -127,20 +142,52 @@ function RotationFormBody({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!parcelaId || !loteId) return;
-    onSubmit({
+    const submitData: RotationCreate = {
       lote_id: Number(loteId),
       parcela_id: Number(parcelaId),
       data_inicio: new Date(dataInicio).toISOString(),
       data_fim: !senDataFin && dataFin ? new Date(dataFin).toISOString() : null,
       notas: notas.trim() || null,
-    });
+    };
+
+    if (!rotation) {
+      const conflicting = activeRotationByLote.get(Number(loteId)) ?? null;
+      const willBeActive = !submitData.data_fim;
+      if (conflicting && willBeActive && onCloseActiveAndCreate) {
+        onCloseActiveAndCreate(submitData, conflicting.id);
+        return;
+      }
+    }
+
+    if (rotation) {
+      const patch: RotationUpdate = {};
+      if (submitData.lote_id !== rotation.lote_id) patch.lote_id = submitData.lote_id;
+      if (submitData.parcela_id !== rotation.parcela_id) patch.parcela_id = submitData.parcela_id;
+      if (new Date(submitData.data_inicio).getTime() !== new Date(rotation.data_inicio).getTime())
+        patch.data_inicio = submitData.data_inicio;
+      const origFin = rotation.data_fim ? new Date(rotation.data_fim).getTime() : null;
+      const newFin = submitData.data_fim ? new Date(submitData.data_fim).getTime() : null;
+      if (origFin !== newFin) patch.data_fim = submitData.data_fim;
+      if ((submitData.notas ?? null) !== (rotation.notas ?? null)) patch.notas = submitData.notas;
+      onSubmit(patch);
+    } else {
+      onSubmit(submitData);
+    }
   };
+
+  const conflictingForSelectedLote =
+    !rotation && senDataFin
+      ? activeRotationByLote.get(Number(loteId)) ?? null
+      : null;
+  const conflictingPlot = conflictingForSelectedLote
+    ? plots.find((p) => p.id === conflictingForSelectedLote.parcela_id)
+    : null;
 
   const dataFinInvalida = !!(
     !senDataFin &&
     dataFin &&
     dataInicio &&
-    dataFin < dataInicio
+    new Date(dataFin).getTime() < new Date(dataInicio).getTime()
   );
 
   return (
@@ -159,6 +206,19 @@ function RotationFormBody({
         {errorMessage ? (
           <Alert variant="destructive" title="Non se puido gardar">
             {errorMessage}
+          </Alert>
+        ) : null}
+
+        {conflictingForSelectedLote ? (
+          <Alert
+            variant="default"
+            title="Xa existe unha rotación activa para este lote"
+          >
+            O lote xa está en pastoreo na parcela{" "}
+            <span className="font-medium">
+              {conflictingPlot ? conflictingPlot.name : `ID ${conflictingForSelectedLote.parcela_id}`}
+            </span>
+            . Ao gardar, pecharemos a rotación activa e crearemos a nova.
           </Alert>
         ) : null}
 
@@ -294,7 +354,11 @@ function RotationFormBody({
             disabled={isPending || !parcelaId || !loteId || dataFinInvalida}
           >
             <SaveIcon className="size-4" />
-            {rotation ? "Gardar cambios" : "Crear rotación"}
+            {rotation
+              ? "Gardar cambios"
+              : conflictingForSelectedLote
+                ? "Pechar activa e crear nova"
+                : "Crear rotación"}
           </Button>
         </DialogFooter>
       </form>

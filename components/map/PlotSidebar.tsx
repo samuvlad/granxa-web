@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useDeletePlot, usePlots, useUpdatePlot } from "@/lib/queries";
 import { getApiErrorMessage } from "@/lib/api";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import type { Plot } from "@/types";
+import type { Plot, PlotUpdate } from "@/types";
 import type { useMapDraft } from "@/app/(app)/parcelas/_hooks/use-map-draft";
 
 interface PlotSidebarProps {
@@ -174,7 +174,7 @@ function PlotEditForm({
   plot: Plot;
   editing: boolean;
   errorMessage: string | null;
-  onSave: (data: { name: string; color: string; notes: string | null }) => void;
+  onSave: (data: PlotUpdate) => void;
   onDelete: () => void;
   onToggleEdit: () => void;
   savePending: boolean;
@@ -183,6 +183,16 @@ function PlotEditForm({
   const [name, setName] = useState(plot.name);
   const [color, setColor] = useState(plot.color);
   const [notes, setNotes] = useState(plot.notes ?? "");
+
+  const trimmedName = name.trim();
+  const trimmedNotes = notes.trim();
+  const patch: PlotUpdate = {};
+  if (trimmedName && trimmedName !== plot.name) patch.name = trimmedName;
+  if (color !== plot.color) patch.color = color;
+  if ((trimmedNotes || null) !== (plot.notes ?? null)) {
+    patch.notes = trimmedNotes || null;
+  }
+  const hasChanges = Object.keys(patch).length > 0;
 
   return (
     <div className="space-y-3">
@@ -236,8 +246,8 @@ function PlotEditForm({
       ) : null}
       <div className="flex gap-2">
         <button
-          onClick={() => onSave({ name, color, notes: notes || null })}
-          disabled={savePending || !name.trim()}
+          onClick={() => onSave(patch)}
+          disabled={savePending || !hasChanges || !trimmedName}
           className="flex-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
         >
           {savePending ? "Gardando..." : "Gardar"}

@@ -239,7 +239,14 @@ export function MapView({
 
       map.on("pm:remove", (e: { layer: L.Layer }) => {
         const plotId = (e.layer as EditableLayer)._plotId;
-        if (plotId) callbacksRef.current.deletePlot.mutate(plotId);
+        if (plotId) {
+          callbacksRef.current.deletePlot.mutate(plotId, {
+            onError: (err) =>
+              setCreateError(
+                getApiErrorMessage(err, "Non se puido eliminar a parcela")
+              ),
+          });
+        }
       });
 
       setIsReady(true);

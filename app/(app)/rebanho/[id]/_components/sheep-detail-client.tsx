@@ -10,7 +10,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
-import type { Sheep, SheepCreate, Lote, Plot } from "@/types";
+import type { Sheep, SheepCreate, SheepUpdate, Lote, Plot } from "@/types";
 import { indexBy } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -81,9 +81,9 @@ export function SheepDetailClient({
     });
   };
 
-  const handleEditSubmit = (data: SheepCreate) => {
+  const handleEditSubmit = (data: SheepCreate | SheepUpdate) => {
     updateSheep.mutate(
-      { id: initialSheep.id, sheep: data },
+      { id: initialSheep.id, sheep: data as SheepUpdate },
       { onSuccess: () => setEditOpen(false) }
     );
   };

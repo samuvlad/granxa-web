@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PlusIcon, RotateCwIcon } from "lucide-react";
 
-import type { Rotation, RotationCreate, Lote, Plot } from "@/types";
+import type { Rotation, RotationCreate, RotationUpdate, Lote, Plot } from "@/types";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RotationFormDialog } from "@/components/grazing/RotationFormDialog";
@@ -44,6 +44,14 @@ export function PastoreoClient({
 
   const { confirm, dialog: confirmDialog } = useConfirm();
 
+  const activeRotationByLote = useMemo(() => {
+    const map = new Map<number, Rotation>();
+    for (const r of rotations) {
+      if (!r.data_fim) map.set(r.lote_id, r);
+    }
+    return map;
+  }, [rotations]);
+
   const handleAdd = () => {
     setEditing(null);
     setFormError(null);
@@ -76,18 +84,39 @@ export function PastoreoClient({
     });
   };
 
-  const handleSubmit = (data: RotationCreate) => {
+  const handleSubmit = (data: RotationCreate | RotationUpdate) => {
     setFormError(null);
     const onSuccess = () => setDialogOpen(false);
     const onError = (err: unknown) => setFormError(getApiErrorMessage(err));
     if (editing) {
       updateRotation.mutate(
-        { id: editing.id, rotation: data },
+        { id: editing.id, rotation: data as RotationUpdate },
         { onSuccess, onError }
       );
     } else {
-      createRotation.mutate(data, { onSuccess, onError });
+      createRotation.mutate(data as RotationCreate, { onSuccess, onError });
     }
+  };
+
+  const handleCloseActiveAndCreate = (
+    data: RotationCreate,
+    activeId: number
+  ) => {
+    setFormError(null);
+    const onCreateSuccess = () => setDialogOpen(false);
+    const onCreateError = (err: unknown) => setFormError(getApiErrorMessage(err));
+    updateRotation.mutate(
+      { id: activeId, rotation: { data_fim: new Date().toISOString() } },
+      {
+        onSuccess: () => {
+          createRotation.mutate(data, {
+            onSuccess: onCreateSuccess,
+            onError: onCreateError,
+          });
+        },
+        onError: (err) => setFormError(getApiErrorMessage(err)),
+      }
+    );
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -123,6 +152,8 @@ export function PastoreoClient({
         rotation={editing}
         plots={plots}
         lotes={lotes}
+        activeRotationByLote={editing ? undefined : activeRotationByLote}
+        onCloseActiveAndCreate={editing ? undefined : handleCloseActiveAndCreate}
         onSubmit={handleSubmit}
         isPending={createRotation.isPending || updateRotation.isPending}
         errorMessage={formError}

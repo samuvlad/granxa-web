@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SaveIcon } from "lucide-react";
 
-import type { Lote, LoteCreate } from "@/types";
+import type { Lote, LoteCreate, LoteUpdate } from "@/types";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ interface LoteFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lote?: Lote | null;
-  onSubmit: (data: LoteCreate) => void;
+  onSubmit: (data: LoteCreate | LoteUpdate) => void;
   isPending?: boolean;
   errorMessage?: string | null;
 }
@@ -67,7 +67,7 @@ function LoteFormBody({
   errorMessage,
 }: {
   lote?: Lote | null;
-  onSubmit: (data: LoteCreate) => void;
+  onSubmit: (data: LoteCreate | LoteUpdate) => void;
   onCancel: () => void;
   isPending: boolean;
   errorMessage: string | null;
@@ -76,13 +76,30 @@ function LoteFormBody({
   const [name, setName] = useState(initial.name);
   const [notas, setNotas] = useState(initial.notas);
 
+  const trimmedName = name.trim();
+  const trimmedNotas = notas.trim();
+  const finalNotas = trimmedNotas || null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      name: name.trim(),
-      notas: notas.trim() || null,
-    });
+    if (!trimmedName) return;
+    if (lote) {
+      const patch: LoteUpdate = {};
+      if (trimmedName !== lote.name) patch.name = trimmedName;
+      if (finalNotas !== (lote.notas ?? null)) patch.notas = finalNotas;
+      onSubmit(patch);
+    } else {
+      onSubmit({ name: trimmedName, notas: finalNotas });
+    }
   };
+
+  const patch: LoteUpdate = lote
+    ? {
+        ...(trimmedName !== lote.name ? { name: trimmedName } : {}),
+        ...(finalNotas !== (lote.notas ?? null) ? { notas: finalNotas } : {}),
+      }
+    : {};
+  const hasChanges = !lote || Object.keys(patch).length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,7 +152,10 @@ function LoteFormBody({
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending || !name.trim()}>
+        <Button
+          type="submit"
+          disabled={isPending || !trimmedName || !hasChanges}
+        >
           <SaveIcon className="size-4" />
           {lote ? "Gardar cambios" : "Crear lote"}
         </Button>

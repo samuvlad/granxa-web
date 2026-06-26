@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { SaveIcon } from "lucide-react";
 
-import type { Lote, Sexo, Sheep, SheepCreate, EstadoAnimal } from "@/types";
+import type {
+  Lote,
+  Sexo,
+  Sheep,
+  SheepCreate,
+  SheepUpdate,
+  EstadoAnimal,
+} from "@/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +39,7 @@ interface SheepFormDialogProps {
   sheep?: Sheep | null;
   sheepOptions: Sheep[];
   lotes?: Lote[];
-  onSubmit: (data: SheepCreate) => void;
+  onSubmit: (data: SheepCreate | SheepUpdate) => void;
   isPending?: boolean;
   errorMessage?: string | null;
 }
@@ -118,7 +125,7 @@ function SheepFormBody({
   sheep?: Sheep | null;
   sheepOptions: Sheep[];
   lotes: Lote[];
-  onSubmit: (data: SheepCreate) => void;
+  onSubmit: (data: SheepCreate | SheepUpdate) => void;
   onCancel: () => void;
   isPending: boolean;
   errorMessage: string | null;
@@ -135,20 +142,47 @@ function SheepFormBody({
   const [loteId, setLoteId] = useState<string>(initial.loteId);
   const [notas, setNotas] = useState(initial.notas);
 
+  const trimmedCrotal = crotal.trim();
+  const trimmedNome = nome.trim();
+  const trimmedRaca = raca.trim();
+  const finalNome = trimmedNome || null;
+  const finalRaca = trimmedRaca || "Gallega";
+  const finalNaiId = naiId ? Number(naiId) : null;
+  const finalPaiId = paiId ? Number(paiId) : null;
+  const finalLoteId = loteId ? Number(loteId) : null;
+  const finalNotas = notas.trim() || null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      crotal: crotal.trim(),
-      nome: nome.trim() || null,
-      sexo,
-      data_nacemento: dataNacemento,
-      raca: raca.trim() || "Gallega",
-      estado,
-      nai_id: naiId ? Number(naiId) : null,
-      pai_id: paiId ? Number(paiId) : null,
-      lote_id: loteId ? Number(loteId) : null,
-      notas: notas.trim() || null,
-    });
+    if (!trimmedCrotal) return;
+    if (sheep) {
+      const patch: SheepUpdate = {};
+      if (trimmedCrotal !== sheep.crotal) patch.crotal = trimmedCrotal;
+      if (finalNome !== (sheep.nome ?? null)) patch.nome = finalNome;
+      if (sexo !== sheep.sexo) patch.sexo = sexo;
+      if (dataNacemento !== sheep.data_nacemento.slice(0, 10))
+        patch.data_nacemento = dataNacemento;
+      if (finalRaca !== sheep.raca) patch.raca = finalRaca;
+      if (estado !== sheep.estado) patch.estado = estado;
+      if (finalNaiId !== (sheep.nai_id ?? null)) patch.nai_id = finalNaiId;
+      if (finalPaiId !== (sheep.pai_id ?? null)) patch.pai_id = finalPaiId;
+      if (finalLoteId !== (sheep.lote_id ?? null)) patch.lote_id = finalLoteId;
+      if (finalNotas !== (sheep.notas ?? null)) patch.notas = finalNotas;
+      onSubmit(patch);
+    } else {
+      onSubmit({
+        crotal: trimmedCrotal,
+        nome: finalNome,
+        sexo,
+        data_nacemento: dataNacemento,
+        raca: finalRaca,
+        estado,
+        nai_id: finalNaiId,
+        pai_id: finalPaiId,
+        lote_id: finalLoteId,
+        notas: finalNotas,
+      });
+    }
   };
 
   const possibleParents = sheepOptions.filter((s) => s.id !== sheep?.id);

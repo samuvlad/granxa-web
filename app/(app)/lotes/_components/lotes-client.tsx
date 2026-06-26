@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PlusIcon, UsersIcon } from "lucide-react";
 
-import type { Lote, LoteCreate, Plot, Rotation, Sheep } from "@/types";
+import type { Lote, LoteCreate, LoteUpdate, Plot, Rotation, Sheep } from "@/types";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoteFormDialog } from "@/components/lotes/LoteFormDialog";
@@ -73,17 +73,17 @@ export function LotesClient({
     });
   };
 
-  const handleSubmit = (data: LoteCreate) => {
+  const handleSubmit = (data: LoteCreate | LoteUpdate) => {
     setFormError(null);
     const onSuccess = () => setDialogOpen(false);
     const onError = (err: unknown) => setFormError(getApiErrorMessage(err));
     if (editing) {
       updateLote.mutate(
-        { id: editing.id, lote: data },
+        { id: editing.id, lote: data as LoteUpdate },
         { onSuccess, onError }
       );
     } else {
-      createLote.mutate(data, { onSuccess, onError });
+      createLote.mutate(data as LoteCreate, { onSuccess, onError });
     }
   };
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PawPrintIcon } from "lucide-react";
 
-import type { Sheep, SheepCreate, Lote } from "@/types";
+import type { Sheep, SheepCreate, SheepUpdate, Lote } from "@/types";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SheepFormDialog } from "@/components/sheep/SheepFormDialog";
@@ -64,17 +64,17 @@ export function RebanhoClient({ initialSheep, initialLotes }: RebanhoClientProps
     });
   };
 
-  const handleSubmit = (data: SheepCreate) => {
+  const handleSubmit = (data: SheepCreate | SheepUpdate) => {
     setFormError(null);
     const onSuccess = () => setDialogOpen(false);
     const onError = (err: unknown) => setFormError(getApiErrorMessage(err));
     if (editing) {
       updateSheep.mutate(
-        { id: editing.id, sheep: data },
+        { id: editing.id, sheep: data as SheepUpdate },
         { onSuccess, onError }
       );
     } else {
-      createSheep.mutate(data, { onSuccess, onError });
+      createSheep.mutate(data as SheepCreate, { onSuccess, onError });
     }
   };
 
