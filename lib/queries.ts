@@ -3,17 +3,22 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
-import { lotes, plots, rotations, sheep } from "@/lib/api";
+import { auth, lotes, plots, rotations, sheep } from "@/lib/api";
+import { clearToken } from "@/lib/auth";
 import type {
   Lote,
   LoteUpdate,
+  LoginRequest,
   Plot,
   PlotUpdate,
   Rotation,
   RotationUpdate,
   Sheep,
   SheepUpdate,
+  Token,
+  User,
 } from "@/types";
 
 export const QUERY_KEYS = {
@@ -21,7 +26,34 @@ export const QUERY_KEYS = {
   sheep: ["sheep"] as const,
   lotes: ["lotes"] as const,
   rotations: ["rotations"] as const,
+  me: ["me"] as const,
 };
+
+export function useMe(initialData?: User) {
+  return useQuery({
+    queryKey: QUERY_KEYS.me,
+    queryFn: auth.me,
+    initialData,
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useLogin() {
+  return useMutation<Token, Error, LoginRequest>({
+    mutationFn: auth.login,
+  });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  const router = useRouter();
+  return () => {
+    clearToken();
+    qc.clear();
+    router.push("/login");
+  };
+}
 
 export function usePlots(initialData?: Plot[]) {
   return useQuery({

@@ -3,23 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  DropletIcon,
-  HeartHandshakeIcon,
-  HomeIcon,
-  MapIcon,
-  PackageIcon,
-  PawPrintIcon,
-  RotateCwIcon,
-  SproutIcon,
-  StethoscopeIcon,
-  UsersIcon,
-  WalletIcon,
-  WheatIcon,
+  Droplet,
+  HeartHandshake,
+  Home,
+  LogOut,
+  Map as MapIcon,
+  Package,
+  PawPrint,
+  RotateCw,
+  Sprout,
+  Stethoscope,
+  Users,
+  Wallet,
+  Wheat,
   type LucideIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useLogout, useMe } from "@/lib/queries";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 type NavItem = {
   href: string;
@@ -37,27 +40,27 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Vista xeral",
     items: [
-      { href: "/", label: "Dashboard", icon: HomeIcon },
+      { href: "/", label: "Dashboard", icon: Home },
       { href: "/parcelas", label: "Parcelas", icon: MapIcon },
     ],
   },
   {
     label: "Gando",
     items: [
-      { href: "/lotes", label: "Lotes", icon: UsersIcon },
-      { href: "/rebanho", label: "Rebaño", icon: PawPrintIcon },
-      { href: "/pastoreo", label: "Pastoreo", icon: RotateCwIcon },
-      { href: "/sanidade", label: "Sanidade", icon: StethoscopeIcon, disabled: true },
-      { href: "/reproducion", label: "Reprodución", icon: HeartHandshakeIcon, disabled: true },
+      { href: "/lotes", label: "Lotes", icon: Users },
+      { href: "/rebanho", label: "Rebaño", icon: PawPrint },
+      { href: "/pastoreo", label: "Pastoreo", icon: RotateCw },
+      { href: "/sanidade", label: "Sanidade", icon: Stethoscope, disabled: true },
+      { href: "/reproducion", label: "Reprodución", icon: HeartHandshake, disabled: true },
     ],
   },
   {
     label: "Operacións",
     items: [
-      { href: "/alimentacion", label: "Alimentación", icon: WheatIcon, disabled: true },
-      { href: "/produccion", label: "Produción", icon: DropletIcon, disabled: true },
-      { href: "/inventario", label: "Inventario", icon: PackageIcon, disabled: true },
-      { href: "/finanzas", label: "Finanzas", icon: WalletIcon, disabled: true },
+      { href: "/alimentacion", label: "Alimentación", icon: Wheat, disabled: true },
+      { href: "/produccion", label: "Produción", icon: Droplet, disabled: true },
+      { href: "/inventario", label: "Inventario", icon: Package, disabled: true },
+      { href: "/finanzas", label: "Finanzas", icon: Wallet, disabled: true },
     ],
   },
 ];
@@ -71,13 +74,15 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const me = useMe();
+  const logout = useLogout();
 
   return (
     <aside className="w-64 min-w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col h-full overflow-hidden">
       <div className="px-5 py-5 border-b border-sidebar-border">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="size-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <SproutIcon className="size-5" />
+            <Sprout className="size-5" />
           </div>
           <div className="leading-tight">
             <p className="font-semibold text-base">Granxa Maps</p>
@@ -106,8 +111,22 @@ export function AppSidebar() {
       </nav>
 
       <Separator />
-      <div className="px-5 py-3 text-xs text-muted-foreground">
-        <p>Granxa Maps · v{APP_VERSION}</p>
+      <div className="px-5 py-3 space-y-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate" title={me.data?.username ?? undefined}>
+            {me.data?.username ?? "—"}
+          </span>
+          <span className="shrink-0">v{APP_VERSION}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={logout}
+        >
+          <LogOut className="size-4" />
+          Pechar sesión
+        </Button>
       </div>
     </aside>
   );

@@ -1,7 +1,9 @@
+import { COOKIE_NAME, LS_KEY, getServerToken } from "@/lib/auth";
 import type {
   Lote,
   LoteCreate,
   LoteUpdate,
+  LoginRequest,
   Plot,
   PlotCreate,
   PlotUpdate,
@@ -11,6 +13,8 @@ import type {
   Sheep,
   SheepCreate,
   SheepUpdate,
+  Token,
+  User,
 } from "@/types";
 
 const API_URL =
@@ -33,12 +37,28 @@ export class ApiError extends Error {
   }
 }
 
+async function getAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return getServerToken();
+  }
+  try {
+    return window.localStorage.getItem(LS_KEY);
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, init: RequestInitJson = {}): Promise<T> {
   const { body, headers, ...rest } = init;
+  const token = await getAuthToken();
+  const authHeader: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
   const res = await fetch(`${API_URL}${path}`, {
     ...rest,
     headers: {
       "Content-Type": "application/json",
+      ...authHeader,
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -77,6 +97,14 @@ export function getApiErrorMessage(
   if (err instanceof Error) return err.message;
   return fallback;
 }
+
+export const auth = {
+  login: (data: LoginRequest) =>
+    request<Token>("/api/auth/login", { method: "POST", body: data }),
+  me: () => request<User>("/api/auth/me"),
+};
+
+export { COOKIE_NAME as AUTH_COOKIE_NAME, LS_KEY as AUTH_LS_KEY };
 
 export const plots = {
   list: () => request<Plot[]>("/api/plots"),
